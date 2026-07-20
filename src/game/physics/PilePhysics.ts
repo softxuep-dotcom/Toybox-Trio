@@ -140,6 +140,18 @@ export class PilePhysics {
         return RAPIER.ColliderDesc.cylinder(0.38, 0.46)
       case 'star':
         return RAPIER.ColliderDesc.ball(0.43)
+      case 'spaceship':
+        return RAPIER.ColliderDesc.cuboid(0.38, 0.25, 0.6)
+      case 'rover':
+        return RAPIER.ColliderDesc.cuboid(0.48, 0.42, 0.5)
+      case 'alien':
+        return RAPIER.ColliderDesc.capsule(0.31, 0.31)
+      case 'arcade':
+        return RAPIER.ColliderDesc.cuboid(0.34, 0.59, 0.44)
+      case 'claw':
+        return RAPIER.ColliderDesc.cuboid(0.42, 0.59, 0.44)
+      case 'monster':
+        return RAPIER.ColliderDesc.cuboid(0.44, 0.51, 0.59)
     }
   }
 

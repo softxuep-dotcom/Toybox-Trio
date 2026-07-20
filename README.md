@@ -28,6 +28,8 @@ npm run preview
 
 ## 资产
 
-精选 GLB 来自 Kenney Cube Pets、Toy Car Kit 和 Brick Kit，均为 CC0。许可证副本位于 `public/licenses/`。其余模型和全部音效由代码生成。
+精选 GLB 来自 Kenney Cube Pets、Toy Car Kit、Brick Kit、Space Kit 和 Mini Arcade，均为 CC0。许可证副本位于 `public/licenses/`。其余模型和全部音效由代码生成。
 
 完整设计见 [DESIGN.md](./DESIGN.md)。
+
+当前 15 类可匹配玩具、模型来源和关卡轮换见 [TOY_CATALOG.md](./TOY_CATALOG.md)。

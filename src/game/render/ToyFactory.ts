@@ -30,6 +30,24 @@ export class ToyFactory {
     const requests: ModelRequest[] = [
       { key: 'car', path: `${baseUrl}models/toy-car-kit/toy-car.glb`, type: 'toy' },
       { key: 'brick', path: `${baseUrl}models/brick-kit/toy-brick.glb`, type: 'toy' },
+      {
+        key: 'monster',
+        path: `${baseUrl}models/toy-car-kit/monster-truck.glb`,
+        type: 'toy',
+      },
+      { key: 'spaceship', path: `${baseUrl}models/space-kit/space-racer.glb`, type: 'toy' },
+      { key: 'rover', path: `${baseUrl}models/space-kit/moon-rover.glb`, type: 'toy' },
+      { key: 'alien', path: `${baseUrl}models/space-kit/alien.glb`, type: 'toy' },
+      {
+        key: 'arcade',
+        path: `${baseUrl}models/mini-arcade/arcade-machine.glb`,
+        type: 'toy',
+      },
+      {
+        key: 'claw',
+        path: `${baseUrl}models/mini-arcade/claw-machine.glb`,
+        type: 'toy',
+      },
       { key: 'cat', path: `${baseUrl}models/cube-pets/pet-cat.glb`, type: 'pet' },
       { key: 'bunny', path: `${baseUrl}models/cube-pets/pet-bunny.glb`, type: 'pet' },
       { key: 'panda', path: `${baseUrl}models/cube-pets/pet-panda.glb`, type: 'pet' },
@@ -113,6 +131,18 @@ export class ToyFactory {
         return this.createDrum()
       case 'star':
         return this.createStar()
+      case 'spaceship':
+        return this.createFallbackSpaceship()
+      case 'rover':
+        return this.createFallbackRover()
+      case 'alien':
+        return this.createFallbackAlien()
+      case 'arcade':
+        return this.createFallbackArcade()
+      case 'claw':
+        return this.createFallbackClawMachine()
+      case 'monster':
+        return this.createFallbackMonsterTruck()
       case 'car':
         return this.createFallbackCar()
       case 'brick':
@@ -264,6 +294,116 @@ export class ToyFactory {
     const group = new THREE.Group()
     group.add(this.mesh(geometry, '#ffd84d', 0.35))
     return group
+  }
+
+  private createFallbackSpaceship(): THREE.Group {
+    const group = new THREE.Group()
+    const body = this.mesh(new THREE.BoxGeometry(0.54, 0.28, 1.04), '#ff9f1c')
+    const nose = this.mesh(new THREE.ConeGeometry(0.34, 0.48, 4), '#ffc45c')
+    nose.rotation.x = Math.PI / 2
+    nose.position.z = -0.7
+    const canopy = this.mesh(new THREE.SphereGeometry(0.24, 12, 8), '#6fd8ff', 0.22)
+    canopy.scale.set(1, 0.68, 1.15)
+    canopy.position.set(0, 0.2, -0.12)
+    group.add(body, nose, canopy)
+    for (const side of [-1, 1]) {
+      const wing = this.mesh(new THREE.BoxGeometry(0.48, 0.09, 0.62), '#6f7cff')
+      wing.position.set(side * 0.42, -0.03, 0.12)
+      wing.rotation.y = side * 0.2
+      group.add(wing)
+    }
+    return group
+  }
+
+  private createFallbackRover(): THREE.Group {
+    const group = new THREE.Group()
+    const body = this.mesh(new THREE.BoxGeometry(0.78, 0.32, 0.68), '#a9b7c6')
+    const cabin = this.mesh(new THREE.BoxGeometry(0.48, 0.3, 0.44), '#ff9f1c')
+    cabin.position.y = 0.3
+    const antenna = this.mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.48, 8), '#59677a')
+    antenna.position.set(0.18, 0.65, 0)
+    const dish = this.mesh(
+      new THREE.SphereGeometry(0.13, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2),
+      '#f7f4ff',
+    )
+    dish.position.set(0.18, 0.88, 0)
+    group.add(body, cabin, antenna, dish)
+    for (const x of [-0.5, 0.5]) {
+      for (const z of [-0.23, 0.23]) {
+        const wheel = this.mesh(
+          new THREE.CylinderGeometry(0.16, 0.16, 0.12, 12),
+          '#384258',
+        )
+        wheel.position.set(x, -0.16, z)
+        wheel.rotation.z = Math.PI / 2
+        group.add(wheel)
+      }
+    }
+    return this.fitModel(group, 1.25)
+  }
+
+  private createFallbackAlien(): THREE.Group {
+    const group = new THREE.Group()
+    const body = this.mesh(new THREE.CapsuleGeometry(0.22, 0.38, 4, 10), '#39cdb8')
+    body.position.y = -0.2
+    const head = this.mesh(new THREE.SphereGeometry(0.38, 16, 10), '#58e3cd')
+    head.scale.set(0.9, 1.08, 0.72)
+    head.position.y = 0.42
+    group.add(body, head)
+    for (const x of [-0.13, 0.13]) {
+      const eye = this.mesh(new THREE.SphereGeometry(0.065, 10, 8), '#192033', 0.2)
+      eye.scale.set(0.72, 1.35, 0.45)
+      eye.position.set(x, 0.47, 0.27)
+      group.add(eye)
+    }
+    return this.fitModel(group, 1.25)
+  }
+
+  private createFallbackArcade(): THREE.Group {
+    const group = new THREE.Group()
+    const cabinet = this.mesh(new THREE.BoxGeometry(0.72, 1.15, 0.72), '#6f7cff')
+    const screen = this.mesh(new THREE.BoxGeometry(0.5, 0.35, 0.06), '#20304e', 0.22)
+    screen.position.set(0, 0.25, 0.39)
+    const controls = this.mesh(new THREE.BoxGeometry(0.56, 0.12, 0.25), '#ff6f91')
+    controls.position.set(0, -0.08, 0.45)
+    const stick = this.mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.18, 8), '#f7f4ff')
+    stick.position.set(-0.14, 0.07, 0.49)
+    group.add(cabinet, screen, controls, stick)
+    return group
+  }
+
+  private createFallbackClawMachine(): THREE.Group {
+    const group = new THREE.Group()
+    const cabinet = this.mesh(new THREE.BoxGeometry(0.82, 1.18, 0.82), '#ff6f91')
+    const windowMesh = this.mesh(new THREE.BoxGeometry(0.62, 0.54, 0.05), '#9ce9ff', 0.18)
+    windowMesh.position.set(0, 0.2, 0.44)
+    const prize = this.mesh(new THREE.SphereGeometry(0.16, 12, 8), '#ffe36e')
+    prize.position.set(0.14, 0.08, 0.48)
+    const controls = this.mesh(new THREE.BoxGeometry(0.62, 0.13, 0.22), '#8c63e6')
+    controls.position.set(0, -0.28, 0.48)
+    group.add(cabinet, windowMesh, prize, controls)
+    return group
+  }
+
+  private createFallbackMonsterTruck(): THREE.Group {
+    const group = new THREE.Group()
+    const body = this.mesh(new THREE.BoxGeometry(0.88, 0.38, 0.74), '#8c63e6')
+    body.position.y = 0.12
+    const cabin = this.mesh(new THREE.BoxGeometry(0.58, 0.36, 0.62), '#c9b8ff')
+    cabin.position.y = 0.46
+    group.add(body, cabin)
+    for (const x of [-0.48, 0.48]) {
+      for (const z of [-0.29, 0.29]) {
+        const wheel = this.mesh(
+          new THREE.CylinderGeometry(0.25, 0.25, 0.15, 14),
+          '#20263a',
+        )
+        wheel.position.set(x, -0.12, z)
+        wheel.rotation.z = Math.PI / 2
+        group.add(wheel)
+      }
+    }
+    return this.fitModel(group, 1.25)
   }
 
   private createFallbackCar(): THREE.Group {

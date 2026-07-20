@@ -18,7 +18,14 @@ ui.bind({
   pause: () => game.togglePause(),
 })
 
-void game.init().catch((error: unknown) => {
-  console.error('Toybox Trio failed to start', error)
-  ui.showToast('Could not open the toybox. Please refresh.', 6000)
-})
+void game
+  .init()
+  .then(() => {
+    if (!import.meta.env.DEV) return
+    const debugBox = Number(new URLSearchParams(window.location.search).get('debugBox'))
+    if (Number.isInteger(debugBox) && debugBox > 0) game.startAt(debugBox)
+  })
+  .catch((error: unknown) => {
+    console.error('Toybox Trio failed to start', error)
+    ui.showToast('Could not open the toybox. Please refresh.', 6000)
+  })

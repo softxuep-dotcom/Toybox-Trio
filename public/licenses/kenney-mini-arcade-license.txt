@@ -1,0 +1,13 @@
+Mini Arcade (1.2)
+
+Created/distributed by Kenney (www.kenney.nl)
+Additional credits: Fleur Keijsers, Guus Vermeulen
+Creation date: 22-07-2024
+
+License: Creative Commons Zero (CC0)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+This content may be used for personal, educational and commercial purposes.
+Crediting Kenney or www.kenney.nl is appreciated but not required.
+
+Source: https://kenney.nl/assets/mini-arcade

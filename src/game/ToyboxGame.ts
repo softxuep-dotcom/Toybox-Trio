@@ -123,6 +123,13 @@ export class ToyboxGame {
     this.startLevel()
   }
 
+  startAt(level: number): void {
+    this.runSeed = createRandomSeed()
+    this.currentLevel = Math.max(1, Math.floor(level))
+    this.bankedScore = 0
+    this.startLevel()
+  }
+
   next(): void {
     this.bankedScore += this.completedLevelScore
     this.currentLevel += 1
