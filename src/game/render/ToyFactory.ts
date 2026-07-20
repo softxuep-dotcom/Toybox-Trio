@@ -48,6 +48,23 @@ export class ToyFactory {
         path: `${baseUrl}models/mini-arcade/claw-machine.glb`,
         type: 'toy',
       },
+      { key: 'train', path: `${baseUrl}models/train-kit/toy-train.glb`, type: 'toy' },
+      {
+        key: 'lollipop',
+        path: `${baseUrl}models/food-kit/toy-lollipop.glb`,
+        type: 'toy',
+      },
+      {
+        key: 'cupcake',
+        path: `${baseUrl}models/food-kit/toy-cupcake.glb`,
+        type: 'toy',
+      },
+      { key: 'banana', path: `${baseUrl}models/food-kit/toy-banana.glb`, type: 'toy' },
+      {
+        key: 'pineapple',
+        path: `${baseUrl}models/food-kit/toy-pineapple.glb`,
+        type: 'toy',
+      },
       { key: 'cat', path: `${baseUrl}models/cube-pets/pet-cat.glb`, type: 'pet' },
       { key: 'bunny', path: `${baseUrl}models/cube-pets/pet-bunny.glb`, type: 'pet' },
       { key: 'panda', path: `${baseUrl}models/cube-pets/pet-panda.glb`, type: 'pet' },
@@ -147,6 +164,16 @@ export class ToyFactory {
         return this.createFallbackCar()
       case 'brick':
         return this.createFallbackBrick()
+      case 'train':
+        return this.createFallbackTrain()
+      case 'lollipop':
+        return this.createFallbackLollipop()
+      case 'cupcake':
+        return this.createFallbackCupcake()
+      case 'banana':
+        return this.createFallbackBanana()
+      case 'pineapple':
+        return this.createFallbackPineapple()
     }
   }
 
@@ -435,6 +462,89 @@ export class ToyFactory {
       }
     }
     return group
+  }
+
+  private createFallbackTrain(): THREE.Group {
+    const group = new THREE.Group()
+    const body = this.mesh(new THREE.BoxGeometry(0.98, 0.42, 0.58), '#e85d75')
+    const cabin = this.mesh(new THREE.BoxGeometry(0.42, 0.5, 0.5), '#7b61ff')
+    cabin.position.set(0.25, 0.42, 0)
+    const boiler = this.mesh(new THREE.CylinderGeometry(0.23, 0.23, 0.58, 14), '#4d96ff')
+    boiler.rotation.z = Math.PI / 2
+    boiler.position.set(-0.28, 0.28, 0)
+    const chimney = this.mesh(new THREE.CylinderGeometry(0.12, 0.17, 0.38, 12), '#ff9f1c')
+    chimney.position.set(-0.38, 0.66, 0)
+    group.add(body, cabin, boiler, chimney)
+    for (const x of [-0.34, 0.34]) {
+      for (const z of [-0.33, 0.33]) {
+        const wheel = this.mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.1, 12), '#24324a')
+        wheel.position.set(x, -0.25, z)
+        wheel.rotation.x = Math.PI / 2
+        group.add(wheel)
+      }
+    }
+    return this.fitModel(group, 1.25)
+  }
+
+  private createFallbackLollipop(): THREE.Group {
+    const group = new THREE.Group()
+    const candy = this.mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.16, 20), '#ff4fa3')
+    candy.rotation.x = Math.PI / 2
+    candy.position.y = 0.32
+    const center = this.mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.18, 20), '#fff2d8')
+    center.rotation.x = Math.PI / 2
+    center.position.set(0, 0.32, 0.01)
+    const stick = this.mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.76, 10), '#f2c894')
+    stick.position.y = -0.3
+    group.add(candy, center, stick)
+    return this.fitModel(group, 1.25)
+  }
+
+  private createFallbackCupcake(): THREE.Group {
+    const group = new THREE.Group()
+    const wrapper = this.mesh(new THREE.CylinderGeometry(0.32, 0.42, 0.52, 16), '#8c63e6')
+    wrapper.position.y = -0.2
+    const frosting = this.mesh(new THREE.SphereGeometry(0.39, 16, 10), '#ff8fbd')
+    frosting.scale.y = 0.72
+    frosting.position.y = 0.22
+    const cherry = this.mesh(new THREE.SphereGeometry(0.1, 12, 8), '#ff5252')
+    cherry.position.y = 0.55
+    group.add(wrapper, frosting, cherry)
+    return this.fitModel(group, 1.25)
+  }
+
+  private createFallbackBanana(): THREE.Group {
+    const group = new THREE.Group()
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-0.55, 0.15, 0),
+      new THREE.Vector3(-0.2, -0.12, 0),
+      new THREE.Vector3(0.2, -0.12, 0),
+      new THREE.Vector3(0.55, 0.15, 0),
+    ])
+    group.add(this.mesh(new THREE.TubeGeometry(curve, 20, 0.16, 10, false), '#ffd43b'))
+    for (const x of [-0.57, 0.57]) {
+      const tip = this.mesh(new THREE.SphereGeometry(0.08, 10, 8), '#7d5a2f')
+      tip.position.set(x, 0.17, 0)
+      group.add(tip)
+    }
+    return this.fitModel(group, 1.25)
+  }
+
+  private createFallbackPineapple(): THREE.Group {
+    const group = new THREE.Group()
+    const fruit = this.mesh(new THREE.SphereGeometry(0.38, 14, 10), '#ffb01f')
+    fruit.scale.y = 1.25
+    fruit.position.y = -0.12
+    group.add(fruit)
+    for (let index = 0; index < 5; index += 1) {
+      const leaf = this.mesh(new THREE.ConeGeometry(0.12, 0.55, 5), '#2bb673')
+      const angle = (index / 5) * Math.PI * 2
+      leaf.position.set(Math.cos(angle) * 0.12, 0.58, Math.sin(angle) * 0.12)
+      leaf.rotation.z = Math.cos(angle) * 0.25
+      leaf.rotation.x = Math.sin(angle) * 0.25
+      group.add(leaf)
+    }
+    return this.fitModel(group, 1.25)
   }
 
   private createFallbackPet(kind: PetModel): THREE.Group {

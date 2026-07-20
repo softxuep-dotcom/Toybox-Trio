@@ -14,6 +14,11 @@ export const TOY_KINDS = [
   'arcade',
   'claw',
   'monster',
+  'train',
+  'lollipop',
+  'cupcake',
+  'banana',
+  'pineapple',
 ] as const
 
 export type ToyKind = (typeof TOY_KINDS)[number]
@@ -40,6 +45,11 @@ export const TOY_DEFINITIONS: Record<ToyKind, ToyDefinition> = {
   arcade: { label: 'Mini arcade', icon: '🕹️', color: '#6f7cff' },
   claw: { label: 'Claw machine', icon: '🧸', color: '#ff6f91' },
   monster: { label: 'Monster truck', icon: '🛻', color: '#8c63e6' },
+  train: { label: 'Toy train', icon: '🚂', color: '#e85d75' },
+  lollipop: { label: 'Swirl lollipop', icon: '🍭', color: '#ff4fa3' },
+  cupcake: { label: 'Toy cupcake', icon: '🧁', color: '#f26b8a' },
+  banana: { label: 'Toy banana', icon: '🍌', color: '#ffd43b' },
+  pineapple: { label: 'Toy pineapple', icon: '🍍', color: '#ff9f43' },
 }
 
 export interface TrayEntry {
@@ -82,12 +92,12 @@ const LEVEL_THREE_KINDS: ToyKind[] = [
 const LEVEL_FOUR_KINDS: ToyKind[] = [
   'arcade',
   'claw',
-  'spaceship',
-  'rover',
-  'alien',
-  'monster',
+  'train',
+  'lollipop',
+  'cupcake',
+  'banana',
+  'pineapple',
   'robot',
-  'drum',
   'star',
 ]
 

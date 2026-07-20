@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, statSync } from 'node:fs'
 import { getLevelConfig, TOY_DEFINITIONS, TOY_KINDS } from '../src/game/types.ts'
 
-assert.equal(TOY_KINDS.length, 15, 'the catalog should contain 15 matching toy types')
+assert.equal(TOY_KINDS.length, 20, 'the catalog should contain 20 matching toy types')
 assert.deepEqual(
   Object.keys(TOY_DEFINITIONS).sort(),
   [...TOY_KINDS].sort(),

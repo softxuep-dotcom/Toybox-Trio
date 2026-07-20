@@ -47,9 +47,9 @@ Poki Player Fit 的正式过线指标是平均游玩超过 3 分钟，且至少 
 | Box 1 | 1 类玩具赛车 | 3 | Mochi 猫 | 无 |
 | Box 2 | 6 类基础玩具 | 36 | Pip 兔 | 抖动 ×1、撤回 ×1 |
 | Box 3 | 7 类机器人、太空和车辆玩具 | 42 | Bao 熊猫 | 抖动 ×1、撤回 ×1 |
-| Box 4 | 9 类街机、太空和进阶玩具 | 54 | Mochi 猫 | 抖动 ×1、撤回 ×1 |
+| Box 4 | 9 类街机、火车和高辨识度玩具 | 54 | Mochi 猫 | 抖动 ×1、撤回 ×1 |
 
-第四关后继续循环宠物，并从完整 15 类玩具库中按关卡轮换 9 类，始终维持 54 件规模。后续正式版本应加入不同容器形状和房间主题，而不是继续堆高单关物件数量。
+第四关后继续循环宠物，并从完整 20 类玩具库中按关卡轮换 9 类，始终维持 54 件规模。后续正式版本应加入不同容器形状和房间主题，而不是继续堆高单关物件数量。
 
 ## 6. 玩具集合
 
@@ -68,8 +68,13 @@ Poki Player Fit 的正式过线指标是平均游玩超过 3 分钟，且至少 
 - 迷你街机：Kenney Mini Arcade GLB。
 - 抓娃娃机：Kenney Mini Arcade GLB。
 - 怪兽卡车：Kenney Toy Car Kit GLB。
+- 玩具火车：Kenney Train Kit GLB。
+- 旋纹棒棒糖：Kenney Food Kit GLB。
+- 玩具纸杯蛋糕：Kenney Food Kit GLB。
+- 玩具香蕉：Kenney Food Kit GLB。
+- 玩具菠萝：Kenney Food Kit GLB。
 
-所有 15 类匹配物件都有独立轮廓、主色、收纳槽图标、碰撞体和程序化回退。完整清单见 `TOY_CATALOG.md`。
+所有 20 类匹配物件都有独立轮廓、主色、收纳槽图标、碰撞体和程序化回退。完整清单见 `TOY_CATALOG.md`。
 
 ## 7. 操作与相机
 
@@ -123,8 +128,10 @@ Poki Player Fit 的正式过线指标是平均游玩超过 3 分钟，且至少 
 - Brick Kit：低模拼搭积木匹配模型。
 - Space Kit：太空赛车、月球车和外星人匹配模型。
 - Mini Arcade：迷你街机和抓娃娃机匹配模型。
+- Train Kit：高辨识度的玩具蒸汽火车匹配模型。
+- Food Kit：棒棒糖、纸杯蛋糕、香蕉和菠萝过家家玩具模型。
 
-项目保留了每个资产包的许可证文件，位于 `public/licenses/`。运行时只包含 11 个精选 GLB（其中 3 个为奖励宠物），`public/models/` 全部文件约 0.84 MB；除 Poki 官方 SDK 外不依赖外部 CDN。
+项目保留了每个资产包的许可证文件，位于 `public/licenses/`。运行时只包含 16 个精选 GLB（其中 3 个为奖励宠物），`public/models/` 全部文件约 1.01 MB；除 Poki 官方 SDK 外不依赖外部 CDN。
 
 ## 12. Poki 接入
 

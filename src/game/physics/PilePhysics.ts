@@ -152,6 +152,16 @@ export class PilePhysics {
         return RAPIER.ColliderDesc.cuboid(0.42, 0.59, 0.44)
       case 'monster':
         return RAPIER.ColliderDesc.cuboid(0.44, 0.51, 0.59)
+      case 'train':
+        return RAPIER.ColliderDesc.cuboid(0.58, 0.39, 0.34)
+      case 'lollipop':
+        return RAPIER.ColliderDesc.capsule(0.42, 0.13)
+      case 'cupcake':
+        return RAPIER.ColliderDesc.cone(0.43, 0.38)
+      case 'banana':
+        return RAPIER.ColliderDesc.capsule(0.38, 0.2)
+      case 'pineapple':
+        return RAPIER.ColliderDesc.capsule(0.38, 0.29)
     }
   }
 

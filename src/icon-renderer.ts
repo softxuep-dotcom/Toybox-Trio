@@ -48,7 +48,8 @@ window.__toyIconDataUrl = () => renderer.domElement.toDataURL('image/png')
 
 void factory.load(() => undefined).then(() => {
   const toy = factory.createToy(kind)
-  toy.rotation.set(0.08, 0.42, -0.035)
+  const iconYaw = kind === 'lollipop' ? -0.94 : 0.42
+  toy.rotation.set(0.08, iconYaw, -0.035)
   scene.add(toy)
   renderer.render(scene, camera)
   requestAnimationFrame(() => {
