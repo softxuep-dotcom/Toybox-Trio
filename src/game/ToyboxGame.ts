@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { AudioSystem } from './audio/AudioSystem'
+import { PilePhysics } from './physics/PilePhysics'
 import { PokiBridge } from './platform/PokiBridge'
 import { ToyFactory } from './render/ToyFactory'
 import { easing, TweenSystem } from './render/TweenSystem'
@@ -38,6 +39,7 @@ export class ToyboxGame {
   private readonly pointer = new THREE.Vector2()
   private readonly tweens = new TweenSystem()
   private readonly factory = new ToyFactory()
+  private readonly physics = new PilePhysics()
   private readonly audio = new AudioSystem()
   private readonly poki = new PokiBridge()
   private readonly items = new Map<string, PileItem>()
@@ -55,6 +57,10 @@ export class ToyboxGame {
   private hoveredItem: PileItem | null = null
   private rescuedPet: THREE.Group | null = null
   private elapsed = 0
+  private cameraYaw = 0
+  private cameraHeight = 10.6
+  private cameraDistance = 14.2
+  private readonly cameraTarget = pileCenter.clone()
   private lastFrameTime = performance.now()
 
   constructor(canvas: HTMLCanvasElement, ui: GameUI) {
@@ -85,7 +91,10 @@ export class ToyboxGame {
   }
 
   async init(): Promise<void> {
-    await this.factory.load((progress) => this.ui.setLoading(progress))
+    await Promise.all([
+      this.physics.init(),
+      this.factory.load((progress) => this.ui.setLoading(progress)),
+    ])
     this.poki.loadingFinished()
     this.ui.showStart()
   }
@@ -132,29 +141,14 @@ export class ToyboxGame {
     this.inputLocked = true
     this.audio.rattle()
     this.ui.setToolCounts(this.rattles, this.undos)
-    const remaining = [...this.items.values()].filter((item) => !item.selected && !item.removed)
     const random = mulberry32(this.currentLevel * 711 + this.state.remaining * 17 + this.rattles)
-    const startRotation = this.pileRoot.rotation.y
+    this.physics.rattle(random)
     this.tweens.add({
-      duration: 0.72,
-      ease: easing.inOutCubic,
-      update: (progress) => {
-        this.pileRoot.rotation.y = startRotation + Math.PI * 2 * progress
-      },
+      duration: 0.68,
+      update: () => undefined,
       complete: () => {
-        this.pileRoot.rotation.y %= Math.PI * 2
         this.inputLocked = false
       },
-    })
-    remaining.forEach((item, index) => {
-      const start = item.object.position.clone()
-      const target = this.pilePosition(index, remaining.length, random, false)
-      this.tweens.add({
-        duration: 0.58,
-        delay: index * 0.002,
-        ease: easing.inOutCubic,
-        update: (progress) => item.object.position.lerpVectors(start, target, progress),
-      })
     })
   }
 
@@ -179,18 +173,20 @@ export class ToyboxGame {
     this.pileRoot.attach(item.object)
     item.object.scale.setScalar(0.92)
     const random = mulberry32(this.currentLevel * 991 + this.state.remaining)
-    const target = new THREE.Vector3(
+    const spawnPosition = new THREE.Vector3(
       (random() - 0.5) * 2.2,
-      3.7 + random() * 0.5,
+      5.2 + random() * 0.8,
       (random() - 0.5) * 1.2,
     )
-    item.object.position.copy(target).add(new THREE.Vector3(0, 1.2, 0))
-    const start = item.object.position.clone()
-    this.tweens.add({
-      duration: 0.42,
-      ease: easing.outBack,
-      update: (progress) => item.object.position.lerpVectors(start, target, progress),
-    })
+    item.object.position.copy(spawnPosition)
+    item.object.rotation.set(random() * Math.PI, random() * Math.PI, random() * Math.PI)
+    this.physics.addItem(
+      item.id,
+      item.kind,
+      item.object,
+      spawnPosition,
+      item.object.quaternion,
+    )
   }
 
   private startLevel(): void {
@@ -208,11 +204,18 @@ export class ToyboxGame {
     this.createPile(deck)
     this.playing = true
     this.paused = false
-    this.inputLocked = false
+    this.inputLocked = true
     this.ui.hideOverlay()
     this.ui.setToolsEnabled(true)
     this.poki.gameplayStart()
     if (this.currentLevel === 1) this.ui.showTutorial()
+    this.tweens.add({
+      duration: 0.95,
+      update: () => undefined,
+      complete: () => {
+        if (this.playing && !this.paused) this.inputLocked = false
+      },
+    })
   }
 
   private createDeck(config: LevelConfig): TrayEntry[] {
@@ -248,7 +251,7 @@ export class ToyboxGame {
         random() * Math.PI * 2,
         (random() - 0.5) * 1.2,
       )
-      object.scale.setScalar(0.001)
+      object.scale.setScalar(targetScale)
       object.userData.itemId = entry.id
       object.traverse((child) => {
         child.userData.itemId = entry.id
@@ -262,12 +265,7 @@ export class ToyboxGame {
       }
       this.items.set(entry.id, item)
       this.pileRoot.add(object)
-      this.tweens.add({
-        duration: 0.42,
-        delay: Math.min(index * 0.012, 0.42),
-        ease: easing.outBack,
-        update: (progress) => object.scale.setScalar(Math.max(0.001, targetScale * progress)),
-      })
+      this.physics.addItem(entry.id, entry.kind, object, object.position, object.quaternion)
     })
   }
 
@@ -277,18 +275,23 @@ export class ToyboxGame {
     random: () => number,
     exposeTriple: boolean,
   ): THREE.Vector3 {
-    if (exposeTriple && index >= total - 3) {
-      return new THREE.Vector3((index - (total - 2)) * 1.35, 3.95, 0.75)
-    }
     const perLayer = 12
     const layer = Math.floor(index / perLayer)
     const slot = index % perLayer
-    const angle = (slot / perLayer) * Math.PI * 2 + layer * 0.47
-    const radius = 2.15 + (random() - 0.5) * 0.65
+    const column = slot % 4
+    const row = Math.floor(slot / 4)
+    const layerCount = Math.ceil(total / perLayer)
+    if (exposeTriple && index >= total - 3) {
+      return new THREE.Vector3(
+        (index - (total - 2)) * 1.35,
+        0.8 + layerCount * 1.28,
+        0.5 + (random() - 0.5) * 0.2,
+      )
+    }
     return new THREE.Vector3(
-      Math.cos(angle) * radius + (random() - 0.5) * 0.55,
-      0.5 + layer * 0.67 + random() * 0.13,
-      Math.sin(angle) * radius * 0.72 + (random() - 0.5) * 0.42,
+      (column - 1.5) * 1.34 + (random() - 0.5) * 0.22,
+      0.58 + layer * 1.28 + random() * 0.08,
+      (row - 1) * 1.3 + (random() - 0.5) * 0.22,
     )
   }
 
@@ -306,6 +309,7 @@ export class ToyboxGame {
     const trayIndex = Math.max(0, result.preResolutionTray.findIndex((entry) => entry.id === item.id))
     const slot = this.ui.getTraySlotCenter(trayIndex)
     const targetPosition = this.screenPointToWorld(slot.x, slot.y, 8.2)
+    this.physics.removeItem(item.id)
     this.scene.attach(item.object)
     const startPosition = item.object.position.clone()
     const startScale = item.object.scale.clone()
@@ -426,7 +430,8 @@ export class ToyboxGame {
         if (totalDistance > 7) this.gesture.dragged = true
         if (this.gesture.dragged) {
           const deltaX = event.clientX - this.gesture.previousX
-          this.pileRoot.rotation.y += deltaX * 0.009
+          this.cameraYaw -= deltaX * 0.009
+          this.updateCamera()
           this.clearHover()
         }
         this.gesture.previousX = event.clientX
@@ -518,10 +523,12 @@ export class ToyboxGame {
     this.tweens.clear()
     this.clearHover()
     for (const item of this.items.values()) item.object.removeFromParent()
+    this.physics.clearItems()
     this.items.clear()
     this.rescuedPet?.removeFromParent()
     this.rescuedPet = null
-    this.pileRoot.rotation.set(0, 0, 0)
+    this.cameraYaw = 0
+    this.updateCamera()
     this.state = null
   }
 
@@ -543,15 +550,17 @@ export class ToyboxGame {
     inset.receiveShadow = true
     this.environmentRoot.add(floor, inset)
 
-    const wallGeometryX = new THREE.BoxGeometry(0.35, 1.2, 6.4)
-    const wallGeometryZ = new THREE.BoxGeometry(8.2, 1.2, 0.35)
+    const wallGeometryX = new THREE.BoxGeometry(0.35, 0.75, 6.4)
+    const wallGeometryZ = new THREE.BoxGeometry(8.2, 0.75, 0.35)
     const leftWall = new THREE.Mesh(wallGeometryX, baseMaterial)
-    leftWall.position.set(-4.08, -0.08, 0)
+    leftWall.position.set(-4.08, -0.29, 0)
     const rightWall = leftWall.clone()
     rightWall.position.x = 4.08
     const backWall = new THREE.Mesh(wallGeometryZ, baseMaterial)
-    backWall.position.set(0, -0.08, -3.08)
-    this.environmentRoot.add(leftWall, rightWall, backWall)
+    backWall.position.set(0, -0.29, -3.08)
+    const frontLip = new THREE.Mesh(wallGeometryZ, baseMaterial)
+    frontLip.position.set(0, -0.29, 3.08)
+    this.environmentRoot.add(leftWall, rightWall, backWall, frontLip)
 
     const table = new THREE.Mesh(
       new THREE.CylinderGeometry(7.2, 7.6, 0.72, 48),
@@ -584,9 +593,20 @@ export class ToyboxGame {
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / Math.max(height, 1)
     const portrait = width / Math.max(height, 1) < 0.82
-    this.camera.position.set(0, portrait ? 13.8 : 10.6, portrait ? 18.5 : 14.2)
-    this.camera.lookAt(portrait ? new THREE.Vector3(0, 1.25, 0.2) : pileCenter)
+    this.cameraHeight = portrait ? 13.8 : 10.6
+    this.cameraDistance = portrait ? 18.5 : 14.2
+    this.cameraTarget.set(0, portrait ? 1.25 : pileCenter.y, portrait ? 0.2 : 0)
+    this.updateCamera()
     this.camera.updateProjectionMatrix()
+  }
+
+  private updateCamera(): void {
+    this.camera.position.set(
+      this.cameraTarget.x + Math.sin(this.cameraYaw) * this.cameraDistance,
+      this.cameraHeight,
+      this.cameraTarget.z + Math.cos(this.cameraYaw) * this.cameraDistance,
+    )
+    this.camera.lookAt(this.cameraTarget)
   }
 
   private animate(): void {
@@ -595,6 +615,7 @@ export class ToyboxGame {
     this.lastFrameTime = now
     if (!this.paused) {
       this.elapsed += delta
+      this.physics.step(delta)
       this.tweens.update(delta)
       if (this.rescuedPet) {
         this.rescuedPet.position.y = 0.78 + Math.sin(this.elapsed * 3.2) * 0.08

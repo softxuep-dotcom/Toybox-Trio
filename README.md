@@ -1,6 +1,6 @@
 # Toybox Trio
 
-原创 Three.js 3D 三同物收集游戏。旋转玩具堆、把三个相同玩具放入收纳槽，并救出箱底的方块宠物。
+原创 Three.js + Rapier 3D 三同物收集游戏。旋转视角观察真实物理玩具堆，把三个相同玩具放入收纳槽，并救出箱底的方块宠物。
 
 在线游玩：https://softxuep-dotcom.github.io/Toybox-Trio/
 
