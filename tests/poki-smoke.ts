@@ -16,6 +16,12 @@ Object.defineProperty(globalThis, 'window', {
         onStart?.()
         calls.push('commercial-break')
       },
+      rewardedBreak: async (options?: { size?: string; onStart?: () => void }) => {
+        options?.onStart?.()
+        calls.push(`rewarded-size:${options?.size}`)
+        calls.push('rewarded-break')
+        return true
+      },
     },
   },
 })
@@ -28,6 +34,7 @@ bridge.gameplayStart()
 bridge.gameplayStop()
 bridge.gameplayStop()
 await bridge.commercialBreak(() => calls.push('ad-start'))
+assert.equal(await bridge.rewardedBreak(() => calls.push('rewarded-ad-start')), true)
 
 assert.deepEqual(calls, [
   'init',
@@ -36,6 +43,9 @@ assert.deepEqual(calls, [
   'gameplay-stop',
   'ad-start',
   'commercial-break',
+  'rewarded-ad-start',
+  'rewarded-size:medium',
+  'rewarded-break',
 ])
 
 Object.defineProperty(globalThis, 'window', { configurable: true, value: {} })
@@ -45,5 +55,6 @@ noSdkBridge.loadingFinished()
 noSdkBridge.gameplayStart()
 noSdkBridge.gameplayStop()
 await noSdkBridge.commercialBreak()
+assert.equal(await noSdkBridge.rewardedBreak(), false)
 
 console.log('Poki bridge smoke tests passed')

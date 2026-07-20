@@ -23,6 +23,15 @@ for (let index = 0; index < losingKinds.length; index += 1) {
 }
 assert.equal(finalLoss, true)
 assert.equal(losingState.tray.length, 7)
+const recovered = losingState.recoverTray(2)
+assert.deepEqual(recovered, [
+  { id: 'toy-5', kind: 'gift' },
+  { id: 'toy-6', kind: 'robot' },
+])
+assert.equal(losingState.tray.length, 5)
+assert.equal(losingState.remaining, 2)
+assert.equal(losingState.select('toy-5')?.lost, false)
+assert.equal(losingState.select('toy-6')?.lost, true)
 
 const undoState = new GameState(entries(['ball', 'car', 'brick']))
 undoState.select('toy-0')
@@ -30,5 +39,6 @@ assert.equal(undoState.remaining, 2)
 assert.deepEqual(undoState.undo(), { id: 'toy-0', kind: 'ball' })
 assert.equal(undoState.remaining, 3)
 assert.equal(undoState.tray.length, 0)
+assert.deepEqual(undoState.recoverTray(2), [])
 
 console.log('GameState smoke tests passed')

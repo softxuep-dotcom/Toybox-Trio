@@ -70,4 +70,14 @@ export class GameState {
     this.comboValue = 0
     return entry
   }
+
+  recoverTray(count: number): TrayEntry[] {
+    const recoveryCount = Math.max(0, Math.min(Math.floor(count), this.trayItems.length))
+    if (recoveryCount === 0) return []
+
+    const recovered = this.trayItems.splice(this.trayItems.length - recoveryCount, recoveryCount)
+    for (const entry of recovered) this.remainingItems.set(entry.id, entry.kind)
+    this.comboValue = 0
+    return recovered
+  }
 }

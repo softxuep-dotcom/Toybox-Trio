@@ -11,6 +11,7 @@ const game = new ToyboxGame(ui.canvas, ui)
 ui.bind({
   start: () => game.start(),
   restart: () => game.restart(),
+  rewardedContinue: () => game.rewardedContinue(),
   next: () => game.next(),
   rattle: () => game.rattle(),
   undo: () => game.undo(),
@@ -29,7 +30,12 @@ void game
   .init()
   .then(() => {
     if (!import.meta.env.DEV) return
-    const debugBox = Number(new URLSearchParams(window.location.search).get('debugBox'))
+    const search = new URLSearchParams(window.location.search)
+    if (search.get('debugOverlay') === 'loss') {
+      ui.showResult(false, 2, 350, 'Pip', true)
+      return
+    }
+    const debugBox = Number(search.get('debugBox'))
     if (Number.isInteger(debugBox) && debugBox > 0) game.startAt(debugBox)
   })
   .catch((error: unknown) => {

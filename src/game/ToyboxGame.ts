@@ -62,6 +62,7 @@ export class ToyboxGame {
   private levelSeed = 0
   private firstLevelHintTimer = 0
   private firstLevelSelectionMade = false
+  private rewardedContinueUsed = false
   private elapsed = 0
   private cameraYaw = 0
   private cameraHeight = 10.6
@@ -193,26 +194,20 @@ export class ToyboxGame {
     this.ui.setToolCounts(this.rattles, this.undos)
     this.ui.renderTray(this.state.tray)
     this.ui.updateStats(this.bankedScore + this.state.score, this.state.remaining)
-    item.selected = false
-    item.removed = false
-    item.object.visible = true
-    this.pileRoot.attach(item.object)
-    item.object.scale.setScalar(0.92)
-    const random = mulberry32((this.levelSeed ^ (this.state.remaining * 991)) >>> 0)
-    const spawnPosition = new THREE.Vector3(
-      (random() - 0.5) * 2.2,
-      5.2 + random() * 0.8,
-      (random() - 0.5) * 1.2,
-    )
-    item.object.position.copy(spawnPosition)
-    item.object.rotation.set(random() * Math.PI, random() * Math.PI, random() * Math.PI)
-    this.physics.addItem(
-      item.id,
-      item.kind,
-      item.object,
-      spawnPosition,
-      item.object.quaternion,
-    )
+    this.restoreItemToPile(entry)
+  }
+
+  rewardedContinue(): void {
+    if (
+      this.transitionPending ||
+      this.playing ||
+      !this.state ||
+      this.rewardedContinueUsed ||
+      this.state.tray.length < 2
+    ) {
+      return
+    }
+    void this.runRewardedContinue(this.state)
   }
 
   private startLevel(): void {
@@ -222,6 +217,7 @@ export class ToyboxGame {
     this.undos = this.config.undos
     this.completedLevelScore = 0
     this.firstLevelSelectionMade = false
+    this.rewardedContinueUsed = false
     this.elapsed = 0
     this.levelSeed = mixSeed(this.runSeed, this.currentLevel)
     const deck = this.createDeck(this.config)
@@ -423,9 +419,42 @@ export class ToyboxGame {
         duration: 0.28,
         update: () => undefined,
         complete: () =>
-          this.ui.showResult(false, this.currentLevel, totalScore, this.config.petName),
+          this.ui.showResult(
+            false,
+            this.currentLevel,
+            totalScore,
+            this.config.petName,
+            !this.rewardedContinueUsed && this.state!.tray.length >= 2,
+          ),
       })
     }
+  }
+
+  private restoreItemToPile(entry: TrayEntry, offset = 0): void {
+    const item = this.items.get(entry.id)
+    if (!item || !this.state) return
+    item.selected = false
+    item.removed = false
+    item.object.visible = true
+    this.pileRoot.attach(item.object)
+    item.object.scale.setScalar(0.92)
+    const random = mulberry32(
+      (this.levelSeed ^ (this.state.remaining * 991 + offset * 0x9e37)) >>> 0,
+    )
+    const spawnPosition = new THREE.Vector3(
+      (random() - 0.5) * 2.2,
+      5.2 + random() * 0.8 + offset * 0.18,
+      (random() - 0.5) * 1.2,
+    )
+    item.object.position.copy(spawnPosition)
+    item.object.rotation.set(random() * Math.PI, random() * Math.PI, random() * Math.PI)
+    this.physics.addItem(
+      item.id,
+      item.kind,
+      item.object,
+      spawnPosition,
+      item.object.quaternion,
+    )
   }
 
   private revealPet(): void {
@@ -570,6 +599,46 @@ export class ToyboxGame {
       this.ui.setOverlayActionsEnabled(true)
     }
     action()
+  }
+
+  private async runRewardedContinue(state: GameState): Promise<void> {
+    this.transitionPending = true
+    this.inputLocked = true
+    this.ui.setOverlayActionsEnabled(false)
+    let rewarded = false
+    try {
+      rewarded = await this.poki.rewardedBreak(() => {
+        this.poki.gameplayStop()
+        this.audio.suspend()
+      })
+    } finally {
+      this.audio.resume()
+      this.transitionPending = false
+      this.ui.setOverlayActionsEnabled(true)
+    }
+
+    if (!rewarded || this.state !== state) {
+      if (!rewarded) this.ui.showRewardUnavailable()
+      return
+    }
+
+    const recovered = state.recoverTray(2)
+    if (recovered.length < 2) {
+      this.ui.showRewardUnavailable()
+      return
+    }
+
+    this.rewardedContinueUsed = true
+    recovered.forEach((entry, index) => this.restoreItemToPile(entry, index))
+    this.ui.renderTray(state.tray)
+    this.ui.updateStats(this.bankedScore + state.score, state.remaining)
+    this.ui.hideOverlay()
+    this.ui.showRewardGranted()
+    this.ui.setToolsEnabled(true)
+    this.playing = true
+    this.paused = false
+    this.inputLocked = false
+    this.poki.gameplayStart()
   }
 
   private scheduleFirstLevelHint(): void {

@@ -1,9 +1,15 @@
+interface RewardedBreakOptions {
+  size?: 'small' | 'medium' | 'large'
+  onStart?: () => void
+}
+
 interface PokiSdkLike {
   init?: () => Promise<unknown>
   gameLoadingFinished?: () => void
   gameplayStart?: () => void
   gameplayStop?: () => void
   commercialBreak?: (onStart?: () => void) => Promise<unknown>
+  rewardedBreak?: (options?: RewardedBreakOptions | (() => void)) => Promise<boolean>
 }
 
 declare global {
@@ -43,6 +49,18 @@ export class PokiBridge {
       await window.PokiSDK?.commercialBreak?.(onStart)
     } catch (error) {
       console.warn('Poki SDK commercial break failed', error)
+    }
+  }
+
+  async rewardedBreak(onStart?: () => void): Promise<boolean> {
+    await this.init()
+    try {
+      const sdk = window.PokiSDK
+      if (!sdk?.rewardedBreak) return false
+      return (await sdk.rewardedBreak({ size: 'medium', onStart })) === true
+    } catch (error) {
+      console.warn('Poki SDK rewarded break failed', error)
+      return false
     }
   }
 

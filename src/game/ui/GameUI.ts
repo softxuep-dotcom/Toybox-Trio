@@ -5,6 +5,7 @@ import { TOY_DEFINITIONS, TOY_KINDS } from '../types'
 export interface UiActions {
   start: () => void
   restart: () => void
+  rewardedContinue: () => void
   next: () => void
   rattle: () => void
   undo: () => void
@@ -45,6 +46,7 @@ export class GameUI {
   private readonly celebration: HTMLElement
   private actions: UiActions | null = null
   private overlayAction: 'start' | 'restart' | 'next' | 'resume' = 'start'
+  private secondaryAction: 'restart' | 'rewardedContinue' | null = null
   private toastTimer = 0
   private totalItems = 1
 
@@ -97,7 +99,7 @@ export class GameUI {
             <div class="mini-toys" aria-hidden="true"><span>🧩</span><span>🤖</span><span>🎁</span></div>
             <p class="overlay-eyebrow" id="overlay-eyebrow">${copy.openingEyebrow}</p>
             <h1 id="overlay-title"><span>TOYBOX</span> TRIO</h1>
-            <p class="overlay-copy" id="overlay-copy">${copy.tagline}</p>
+            <p class="overlay-copy" id="overlay-copy" aria-live="polite">${copy.tagline}</p>
             <button class="primary-button" id="primary-button" type="button" disabled>${copy.loading}</button>
             <button class="secondary-button hidden" id="secondary-button" type="button">${copy.retry}</button>
             <div class="loading-row" id="loading-text"><span>${copy.loading}</span><b>0%</b></div>
@@ -146,6 +148,7 @@ export class GameUI {
 
   showStart(): void {
     this.overlayAction = 'start'
+    this.secondaryAction = null
     this.overlayEyebrow.textContent = copy.openingEyebrow
     this.overlayTitle.innerHTML = '<span>TOYBOX</span> TRIO'
     this.overlayCopy.textContent = copy.tagline
@@ -164,6 +167,7 @@ export class GameUI {
 
   showPause(): void {
     this.overlayAction = 'resume'
+    this.secondaryAction = 'restart'
     this.overlayEyebrow.textContent = copy.pausedEyebrow
     this.overlayTitle.textContent = copy.pause
     this.overlayCopy.textContent = copy.tagline
@@ -174,8 +178,19 @@ export class GameUI {
     this.setOverlayVisible(true)
   }
 
-  showResult(won: boolean, level: number, score: number, petName: string): void {
+  showResult(
+    won: boolean,
+    level: number,
+    score: number,
+    petName: string,
+    canUseRewardedContinue = false,
+  ): void {
     this.overlayAction = won ? 'next' : 'restart'
+    this.secondaryAction = won
+      ? 'restart'
+      : canUseRewardedContinue
+        ? 'rewardedContinue'
+        : null
     this.overlayEyebrow.textContent = won
       ? `${copy.safe}: ${petName.toUpperCase()}`
       : copy.oneMoreTry
@@ -184,8 +199,8 @@ export class GameUI {
       ? `${copy.level} ${level} · ${copy.score} ${score.toLocaleString(locale)}`
       : `${copy.score} ${score.toLocaleString(locale)} · ${copy.remaining} ${this.remainingLabel.textContent}`
     this.primaryButton.textContent = won ? copy.next : copy.retry
-    this.secondaryButton.textContent = copy.retry
-    this.secondaryButton.classList.toggle('hidden', !won)
+    this.secondaryButton.textContent = won ? copy.retry : copy.rewardedContinue
+    this.secondaryButton.classList.toggle('hidden', this.secondaryAction === null)
     this.setOverlayActionsEnabled(true)
     this.setOverlayVisible(true)
     if (won) this.launchCelebration()
@@ -280,6 +295,14 @@ export class GameUI {
     this.showToast(copy.trayEmpty)
   }
 
+  showRewardGranted(): void {
+    this.showToast(copy.rewardGranted, 2600)
+  }
+
+  showRewardUnavailable(): void {
+    this.overlayCopy.textContent = copy.rewardUnavailable
+  }
+
   showGraphicsRestoring(): void {
     this.showToast(copy.graphicsRestoring, 3000)
   }
@@ -365,7 +388,10 @@ export class GameUI {
       if (this.overlayAction === 'next') this.actions.next()
       if (this.overlayAction === 'resume') this.actions.pause()
     })
-    this.secondaryButton.addEventListener('click', () => this.actions?.restart())
+    this.secondaryButton.addEventListener('click', () => {
+      if (this.secondaryAction === 'restart') this.actions?.restart()
+      if (this.secondaryAction === 'rewardedContinue') this.actions?.rewardedContinue()
+    })
     this.rattleButton.addEventListener('click', () => this.actions?.rattle())
     this.undoButton.addEventListener('click', () => this.actions?.undo())
     this.soundButton.addEventListener('click', () => this.actions?.sound())
