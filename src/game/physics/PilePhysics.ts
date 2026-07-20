@@ -55,6 +55,18 @@ export class PilePhysics {
     this.items.delete(id)
   }
 
+  placeItem(id: string, position: THREE.Vector3, rotation: THREE.Quaternion): void {
+    const item = this.items.get(id)
+    if (!item) return
+    item.body.setTranslation({ x: position.x, y: position.y, z: position.z }, true)
+    item.body.setRotation(
+      { x: rotation.x, y: rotation.y, z: rotation.z, w: rotation.w },
+      true,
+    )
+    item.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    item.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+  }
+
   clearItems(): void {
     if (!this.world) return
     for (const item of this.items.values()) this.world.removeRigidBody(item.body)

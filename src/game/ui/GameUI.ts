@@ -29,6 +29,9 @@ const copy = isChinese
       score: '得分',
       tray: '收纳槽 · 三个相同玩具会自动归位',
       tutorial: '点击玩具来收集 · 拖动画面旋转玩具堆',
+      tutorialGroup: (group: number, collected: number) =>
+        `教学 ${group}/2 · 点击发光黑边玩具（${collected}/3）`,
+      tutorialDone: '就是这样！三个相同玩具会自动消除',
       rattle: '抖一抖',
       undo: '撤回',
       rescue: '救出',
@@ -48,6 +51,9 @@ const copy = isChinese
       score: 'Score',
       tray: 'Tidy tray · Three matching toys pack themselves away',
       tutorial: 'Tap a toy to collect it · Drag to turn the pile',
+      tutorialGroup: (group: number, collected: number) =>
+        `Tutorial ${group}/2 · Tap the glowing outlined toys (${collected}/3)`,
+      tutorialDone: 'That’s it! Three matching toys clear automatically',
       rattle: 'Rattle',
       undo: 'Undo',
       rescue: 'Rescue',
@@ -70,6 +76,7 @@ export class GameUI {
   private readonly progressBar: HTMLElement
   private readonly petGoal: HTMLElement
   private readonly toast: HTMLElement
+  private readonly traySlotsRoot: HTMLElement
   private readonly traySlots: HTMLElement[]
   private readonly rattleButton: HTMLButtonElement
   private readonly undoButton: HTMLButtonElement
@@ -156,6 +163,7 @@ export class GameUI {
     this.progressBar = this.required('#progress-bar')
     this.petGoal = this.required('#pet-goal')
     this.toast = this.required('#tutorial-toast')
+    this.traySlotsRoot = this.required('#tray-slots')
     this.traySlots = Array.from(root.querySelectorAll<HTMLElement>('.tray-slot'))
     this.rattleButton = this.required<HTMLButtonElement>('#rattle-button')
     this.undoButton = this.required<HTMLButtonElement>('#undo-button')
@@ -238,6 +246,11 @@ export class GameUI {
       const entry = entries[index]
       slot.className = 'tray-slot'
       slot.replaceChildren()
+      delete slot.dataset.kind
+      slot.style.removeProperty('--toy-color')
+      slot.style.removeProperty('--match-x')
+      slot.style.removeProperty('--match-delay')
+      slot.removeAttribute('aria-label')
       if (!entry) return
       const definition = TOY_DEFINITIONS[entry.kind]
       slot.dataset.kind = entry.kind
@@ -249,9 +262,24 @@ export class GameUI {
   }
 
   flashMatch(kind: ToyKind): void {
-    for (const slot of this.traySlots) {
-      if (slot.dataset.kind === kind) slot.classList.add('matching')
-    }
+    const matchingSlots = this.traySlots.filter((slot) => slot.dataset.kind === kind)
+    if (matchingSlots.length === 0) return
+
+    const slotsRect = this.traySlotsRoot.getBoundingClientRect()
+    const slotRects = matchingSlots.map((slot) => slot.getBoundingClientRect())
+    const centerX =
+      slotRects.reduce((sum, rect) => sum + rect.left + rect.width / 2, 0) / slotRects.length
+    const centerY =
+      slotRects.reduce((sum, rect) => sum + rect.top + rect.height / 2, 0) / slotRects.length
+
+    matchingSlots.forEach((slot, index) => {
+      const rect = slotRects[index]
+      const slotCenter = rect.left + rect.width / 2
+      slot.style.setProperty('--match-x', `${centerX - slotCenter}px`)
+      slot.style.setProperty('--match-delay', `${index * 0.035}s`)
+      slot.classList.add('matching')
+    })
+    this.launchMatchBurst(kind, centerX - slotsRect.left, centerY - slotsRect.top)
   }
 
   getTraySlotCenter(index: number): { x: number; y: number } {
@@ -282,11 +310,41 @@ export class GameUI {
     this.showToast(copy.tutorial, 4800)
   }
 
+  showTutorialStep(group: 1 | 2, collected: number): void {
+    this.showToast(copy.tutorialGroup(group, collected), 0)
+  }
+
+  showTutorialComplete(): void {
+    this.showToast(copy.tutorialDone, 3200)
+  }
+
   showToast(message: string, duration = 1800): void {
     window.clearTimeout(this.toastTimer)
     this.toast.textContent = message
     this.toast.classList.add('visible')
-    this.toastTimer = window.setTimeout(() => this.toast.classList.remove('visible'), duration)
+    if (duration > 0) {
+      this.toastTimer = window.setTimeout(() => this.toast.classList.remove('visible'), duration)
+    }
+  }
+
+  private launchMatchBurst(kind: ToyKind, x: number, y: number): void {
+    this.traySlotsRoot.querySelector('.tray-match-burst')?.remove()
+    const burst = document.createElement('div')
+    burst.className = 'tray-match-burst'
+    burst.style.left = `${x}px`
+    burst.style.top = `${y}px`
+    burst.style.setProperty('--toy-color', TOY_DEFINITIONS[kind].color)
+    burst.innerHTML = `<strong aria-hidden="true">${TOY_DEFINITIONS[kind].icon}</strong>${Array.from(
+      { length: 9 },
+      (_, index) => {
+        const angle = (index / 9) * Math.PI * 2
+        const distance = 28 + (index % 3) * 7
+        return `<i style="--burst-x:${Math.cos(angle) * distance}px;--burst-y:${Math.sin(angle) * distance}px"></i>`
+      },
+    ).join('')}`
+    this.traySlotsRoot.append(burst)
+    requestAnimationFrame(() => burst.classList.add('active'))
+    window.setTimeout(() => burst.remove(), 900)
   }
 
   private launchCelebration(): void {

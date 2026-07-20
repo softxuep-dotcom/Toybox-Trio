@@ -376,6 +376,7 @@ button:focus-visible {
 }
 
 .tray-slots {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(7, minmax(42px, 1fr));
   gap: 7px;
@@ -427,7 +428,49 @@ button:focus-visible {
 
 .tray-slot.matching {
   z-index: 2;
-  animation: slot-match 0.4s ease both;
+  animation: slot-match 0.72s var(--match-delay, 0s) cubic-bezier(0.2, 0.8, 0.25, 1) both;
+}
+
+.tray-match-burst {
+  position: absolute;
+  z-index: 8;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.tray-match-burst strong {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  margin: -25px;
+  border: 3px solid white;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--toy-color) 78%, white);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--toy-color) 38%, transparent);
+  font-size: 1.65rem;
+  opacity: 0;
+}
+
+.tray-match-burst i {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  margin: -4px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: var(--toy-color);
+  opacity: 0;
+}
+
+.tray-match-burst.active strong {
+  animation: tray-burst-core 0.72s ease-out both;
+}
+
+.tray-match-burst.active i {
+  animation: tray-burst-dot 0.62s 0.1s ease-out both;
 }
 
 .game-overlay {
@@ -627,15 +670,49 @@ button:focus-visible {
 }
 
 @keyframes slot-match {
-  45% {
+  38% {
     border-color: white;
     background: var(--toy-color);
     box-shadow: 0 0 0 8px color-mix(in srgb, var(--toy-color) 20%, transparent);
-    transform: translateY(-7px) scale(1.06);
+    transform: translateX(var(--match-x, 0)) translateY(-7px) scale(1.08);
+  }
+  58% {
+    border-color: white;
+    background: white;
+    opacity: 1;
+    transform: translateX(var(--match-x, 0)) translateY(-7px) scale(0.86);
   }
   100% {
     opacity: 0;
-    transform: translateY(-14px) scale(0.7) rotate(8deg);
+    transform: translateX(var(--match-x, 0)) translateY(-16px) scale(0.12) rotate(14deg);
+  }
+}
+
+@keyframes tray-burst-core {
+  0% {
+    opacity: 0;
+    transform: scale(0.25) rotate(-12deg);
+  }
+  35% {
+    opacity: 1;
+    box-shadow: 0 0 0 15px color-mix(in srgb, var(--toy-color) 22%, transparent);
+    transform: scale(1.15) rotate(5deg);
+  }
+  100% {
+    opacity: 0;
+    box-shadow: 0 0 0 27px transparent;
+    transform: scale(0.72) rotate(12deg);
+  }
+}
+
+@keyframes tray-burst-dot {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--burst-x), var(--burst-y)) scale(0.35);
   }
 }
 

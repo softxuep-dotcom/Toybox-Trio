@@ -42,6 +42,12 @@ export class ToyboxGame {
   private readonly physics = new PilePhysics()
   private readonly audio = new AudioSystem()
   private readonly poki = new PokiBridge()
+  private readonly tutorialOutlineMaterial = new THREE.MeshBasicMaterial({
+    color: '#171226',
+    side: THREE.BackSide,
+    depthWrite: false,
+    toneMapped: false,
+  })
   private readonly items = new Map<string, PileItem>()
   private state: GameState | null = null
   private config: LevelConfig = getLevelConfig(1)
@@ -56,6 +62,10 @@ export class ToyboxGame {
   private gesture: PointerGesture | null = null
   private hoveredItem: PileItem | null = null
   private rescuedPet: THREE.Group | null = null
+  private runSeed = createRandomSeed()
+  private levelSeed = 0
+  private tutorialGroups: string[][] = []
+  private tutorialGroupIndex = -1
   private elapsed = 0
   private cameraYaw = 0
   private cameraHeight = 10.6
@@ -101,6 +111,7 @@ export class ToyboxGame {
 
   start(): void {
     this.audio.unlock()
+    this.runSeed = createRandomSeed()
     this.currentLevel = 1
     this.bankedScore = 0
     this.startLevel()
@@ -108,6 +119,7 @@ export class ToyboxGame {
 
   restart(): void {
     this.audio.unlock()
+    this.runSeed = createRandomSeed()
     this.startLevel()
   }
 
@@ -141,7 +153,9 @@ export class ToyboxGame {
     this.inputLocked = true
     this.audio.rattle()
     this.ui.setToolCounts(this.rattles, this.undos)
-    const random = mulberry32(this.currentLevel * 711 + this.state.remaining * 17 + this.rattles)
+    const random = mulberry32(
+      (this.levelSeed ^ (this.state.remaining * 17 + this.rattles * 711)) >>> 0,
+    )
     this.physics.rattle(random)
     this.tweens.add({
       duration: 0.68,
@@ -172,7 +186,7 @@ export class ToyboxGame {
     item.object.visible = true
     this.pileRoot.attach(item.object)
     item.object.scale.setScalar(0.92)
-    const random = mulberry32(this.currentLevel * 991 + this.state.remaining)
+    const random = mulberry32((this.levelSeed ^ (this.state.remaining * 991)) >>> 0)
     const spawnPosition = new THREE.Vector3(
       (random() - 0.5) * 2.2,
       5.2 + random() * 0.8,
@@ -187,6 +201,10 @@ export class ToyboxGame {
       spawnPosition,
       item.object.quaternion,
     )
+    if (this.currentTutorialGroup()?.includes(item.id)) {
+      this.setTutorialHighlight(item.object, true)
+      this.showTutorialProgress()
+    }
   }
 
   private startLevel(): void {
@@ -196,6 +214,7 @@ export class ToyboxGame {
     this.undos = this.config.undos
     this.completedLevelScore = 0
     this.elapsed = 0
+    this.levelSeed = mixSeed(this.runSeed, this.currentLevel)
     const deck = this.createDeck(this.config)
     this.state = new GameState(deck)
     this.ui.setLevel(this.config, deck.length)
@@ -208,7 +227,6 @@ export class ToyboxGame {
     this.ui.hideOverlay()
     this.ui.setToolsEnabled(true)
     this.poki.gameplayStart()
-    if (this.currentLevel === 1) this.ui.showTutorial()
     this.tweens.add({
       duration: 0.95,
       update: () => undefined,
@@ -228,20 +246,29 @@ export class ToyboxGame {
       }
     }
 
-    const random = mulberry32(config.number * 92821 + 41)
+    const random = mulberry32((this.levelSeed ^ 0x6ac690c5) >>> 0)
     shuffle(deck, random)
-    const tutorialKind = config.kinds[0]
-    const tutorialEntries = deck.filter((entry) => entry.kind === tutorialKind).slice(0, 3)
-    tutorialEntries.forEach((entry, index) => {
-      const currentIndex = deck.indexOf(entry)
-      const targetIndex = deck.length - 3 + index
-      ;[deck[currentIndex], deck[targetIndex]] = [deck[targetIndex], deck[currentIndex]]
-    })
+
+    this.tutorialGroups = []
+    this.tutorialGroupIndex = -1
+    if (config.number === 1) {
+      const groups = config.kinds
+        .slice(0, 2)
+        .map((kind) => deck.filter((entry) => entry.kind === kind).slice(0, 3))
+      const tutorialEntries = groups.flat()
+      tutorialEntries.forEach((entry, index) => {
+        const currentIndex = deck.indexOf(entry)
+        const targetIndex = deck.length - tutorialEntries.length + index
+        ;[deck[currentIndex], deck[targetIndex]] = [deck[targetIndex], deck[currentIndex]]
+      })
+      this.tutorialGroups = groups.map((group) => group.map((entry) => entry.id))
+      this.tutorialGroupIndex = 0
+    }
     return deck
   }
 
   private createPile(deck: TrayEntry[]): void {
-    const random = mulberry32(this.currentLevel * 5527 + 97)
+    const random = mulberry32((this.levelSeed ^ 0x9e3779b9) >>> 0)
     deck.forEach((entry, index) => {
       const object = this.factory.createToy(entry.kind)
       const targetScale = 0.92
@@ -267,6 +294,7 @@ export class ToyboxGame {
       this.pileRoot.add(object)
       this.physics.addItem(entry.id, entry.kind, object, object.position, object.quaternion)
     })
+    this.activateTutorialGroup()
   }
 
   private pilePosition(
@@ -281,11 +309,15 @@ export class ToyboxGame {
     const column = slot % 4
     const row = Math.floor(slot / 4)
     const layerCount = Math.ceil(total / perLayer)
-    if (exposeTriple && index >= total - 3) {
+    const tutorialTopCount = this.currentLevel === 1 ? 6 : 0
+    if (exposeTriple && tutorialTopCount > 0 && index >= total - tutorialTopCount) {
+      const tutorialIndex = index - (total - tutorialTopCount)
+      const groupIndex = Math.floor(tutorialIndex / 3)
+      const indexInGroup = tutorialIndex % 3
       return new THREE.Vector3(
-        (index - (total - 2)) * 1.35,
-        0.8 + layerCount * 1.28,
-        0.5 + (random() - 0.5) * 0.2,
+        (indexInGroup - 1) * 1.38,
+        0.8 + layerCount * 1.28 + (groupIndex === 0 ? 0.62 : 0),
+        (groupIndex === 0 ? 0.62 : -0.55) + (random() - 0.5) * 0.16,
       )
     }
     return new THREE.Vector3(
@@ -297,15 +329,21 @@ export class ToyboxGame {
 
   private selectItem(item: PileItem): void {
     if (!this.canInteract() || !this.state || item.selected || item.removed) return
+    const tutorialGroup = this.currentTutorialGroup()
+    if (tutorialGroup && !tutorialGroup.includes(item.id)) {
+      this.showTutorialProgress()
+      return
+    }
     const result = this.state.select(item.id)
     if (!result) return
 
     this.inputLocked = true
     item.selected = true
     this.clearHover()
+    this.setTutorialHighlight(item.object, false)
     this.audio.pick()
-    this.ui.renderTray(result.preResolutionTray)
     this.ui.updateStats(this.bankedScore + result.score, result.remaining)
+    this.showTutorialProgress()
     const trayIndex = Math.max(0, result.preResolutionTray.findIndex((entry) => entry.id === item.id))
     const slot = this.ui.getTraySlotCenter(trayIndex)
     const targetPosition = this.screenPointToWorld(slot.x, slot.y, 8.2)
@@ -327,14 +365,25 @@ export class ToyboxGame {
       },
       complete: () => {
         item.object.visible = false
-        if (result.matched.length > 0) this.resolveMatch(result)
-        else this.completeSelection(result)
+        this.ui.renderTray(result.preResolutionTray)
+        if (result.matched.length > 0) {
+          this.tweens.add({
+            duration: 0.08,
+            update: () => undefined,
+            complete: () => this.resolveMatch(result),
+          })
+        } else {
+          this.completeSelection(result)
+        }
       },
     })
   }
 
   private resolveMatch(result: SelectionResult): void {
     const kind = result.matched[0].kind
+    const matchedIds = new Set(result.matched.map((entry) => entry.id))
+    const tutorialGroupCompleted =
+      this.currentTutorialGroup()?.every((id) => matchedIds.has(id)) ?? false
     this.ui.flashMatch(kind)
     this.audio.match(result.combo)
     for (const entry of result.matched) {
@@ -342,10 +391,11 @@ export class ToyboxGame {
       if (matchedItem) matchedItem.removed = true
     }
     this.tweens.add({
-      duration: 0.24,
+      duration: 0.84,
       update: () => undefined,
       complete: () => {
         this.ui.renderTray(result.tray)
+        if (tutorialGroupCompleted) this.advanceTutorialGroup()
         this.completeSelection(result)
       },
     })
@@ -477,15 +527,144 @@ export class ToyboxGame {
   }
 
   private setGlow(object: THREE.Object3D, enabled: boolean): void {
+    const tutorialHighlighted = Boolean(object.userData.tutorialHighlighted)
     object.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
       const materials = Array.isArray(child.material) ? child.material : [child.material]
       for (const material of materials) {
         if (!(material instanceof THREE.MeshStandardMaterial)) continue
-        material.emissive.set(enabled ? '#8877ff' : '#000000')
-        material.emissiveIntensity = enabled ? 0.18 : 0
+        if (tutorialHighlighted) {
+          material.emissive.set(enabled ? '#fff7ad' : '#ffd43b')
+          material.emissiveIntensity = enabled ? 1.45 : 0.98
+        } else {
+          material.emissive.set(enabled ? '#8877ff' : '#000000')
+          material.emissiveIntensity = enabled ? 0.18 : 0
+        }
       }
     })
+  }
+
+  private activateTutorialGroup(): void {
+    const group = this.currentTutorialGroup()
+    if (!group) return
+    const random = mulberry32(
+      (this.levelSeed ^ ((this.tutorialGroupIndex + 1) * 0x45d9f3b)) >>> 0,
+    )
+    group.forEach((id, index) => {
+      const item = this.items.get(id)
+      if (!item || item.selected || item.removed) return
+      const position = new THREE.Vector3(
+        (index - 1) * 1.38,
+        4.3 + index * 0.1,
+        0.45 + (random() - 0.5) * 0.2,
+      )
+      const rotation = new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(
+          (random() - 0.5) * 0.8,
+          random() * Math.PI * 2,
+          (random() - 0.5) * 0.8,
+        ),
+      )
+      this.physics.placeItem(id, position, rotation)
+      this.setTutorialHighlight(item.object, true)
+    })
+    this.showTutorialProgress()
+  }
+
+  private advanceTutorialGroup(): void {
+    this.tutorialGroupIndex += 1
+    if (this.tutorialGroupIndex >= this.tutorialGroups.length) {
+      this.tutorialGroupIndex = -1
+      this.ui.showTutorialComplete()
+      return
+    }
+    this.activateTutorialGroup()
+  }
+
+  private currentTutorialGroup(): string[] | null {
+    if (this.tutorialGroupIndex < 0) return null
+    return this.tutorialGroups[this.tutorialGroupIndex] ?? null
+  }
+
+  private showTutorialProgress(): void {
+    const group = this.currentTutorialGroup()
+    if (!group || this.tutorialGroupIndex > 1) return
+    const collected = group.filter((id) => this.items.get(id)?.selected).length
+    this.ui.showTutorialStep((this.tutorialGroupIndex + 1) as 1 | 2, collected)
+  }
+
+  private setTutorialHighlight(object: THREE.Object3D, enabled: boolean): void {
+    if (Boolean(object.userData.tutorialHighlighted) === enabled) return
+    object.userData.tutorialHighlighted = enabled
+
+    const outlineMeshes: THREE.Mesh[] = []
+    const sourceMeshes: THREE.Mesh[] = []
+    object.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      if (child.userData.tutorialOutline) outlineMeshes.push(child)
+      else sourceMeshes.push(child)
+    })
+
+    for (const outline of outlineMeshes) outline.removeFromParent()
+
+    for (const mesh of sourceMeshes) {
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+      for (const material of materials) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue
+        if (enabled) {
+          material.userData.tutorialMaterialState = {
+            emissive: material.emissive.getHex(),
+            emissiveIntensity: material.emissiveIntensity,
+            roughness: material.roughness,
+          }
+          material.emissive.set('#ffd43b')
+          material.emissiveIntensity = 0.98
+          material.roughness = Math.min(material.roughness, 0.34)
+        } else {
+          const state = material.userData.tutorialMaterialState as
+            | { emissive: number; emissiveIntensity: number; roughness: number }
+            | undefined
+          if (state) {
+            material.emissive.setHex(state.emissive)
+            material.emissiveIntensity = state.emissiveIntensity
+            material.roughness = state.roughness
+            delete material.userData.tutorialMaterialState
+          }
+        }
+      }
+
+      if (enabled) {
+        const outline = new THREE.Mesh(mesh.geometry, this.tutorialOutlineMaterial)
+        outline.userData.tutorialOutline = true
+        outline.scale.setScalar(1.075)
+        outline.castShadow = false
+        outline.receiveShadow = false
+        outline.raycast = () => undefined
+        mesh.add(outline)
+      }
+    }
+  }
+
+  private updateTutorialPulse(): void {
+    const group = this.currentTutorialGroup()
+    if (!group) return
+    const pulse = 0.94 + Math.sin(this.elapsed * 5.2) * 0.2
+    const outlineScale = 1.075 + Math.sin(this.elapsed * 5.2) * 0.008
+    for (const id of group) {
+      const item = this.items.get(id)
+      if (!item || item.selected || item.removed) continue
+      item.object.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return
+        if (child.userData.tutorialOutline) {
+          child.scale.setScalar(outlineScale)
+          return
+        }
+        const materials = Array.isArray(child.material) ? child.material : [child.material]
+        for (const material of materials) {
+          if (material instanceof THREE.MeshStandardMaterial) material.emissiveIntensity = pulse
+        }
+      })
+    }
   }
 
   private pick(clientX: number, clientY: number): PileItem | null {
@@ -617,6 +796,7 @@ export class ToyboxGame {
       this.elapsed += delta
       this.physics.step(delta)
       this.tweens.update(delta)
+      this.updateTutorialPulse()
       if (this.rescuedPet) {
         this.rescuedPet.position.y = 0.78 + Math.sin(this.elapsed * 3.2) * 0.08
         this.rescuedPet.rotation.y += delta * 0.45
@@ -642,6 +822,23 @@ function mulberry32(seed: number): () => number {
     value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296
   }
+}
+
+function createRandomSeed(): number {
+  try {
+    const value = new Uint32Array(1)
+    crypto.getRandomValues(value)
+    return value[0] || 1
+  } catch {
+    return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0
+  }
+}
+
+function mixSeed(seed: number, level: number): number {
+  let value = (seed ^ Math.imul(level, 0x9e3779b1)) >>> 0
+  value = Math.imul(value ^ (value >>> 16), 0x85ebca6b)
+  value = Math.imul(value ^ (value >>> 13), 0xc2b2ae35)
+  return (value ^ (value >>> 16)) >>> 0
 }
 
 function shuffle<T>(items: T[], random: () => number): void {
