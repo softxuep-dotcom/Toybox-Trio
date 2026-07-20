@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync, statSync } from 'node:fs'
 import { getLevelConfig, TOY_DEFINITIONS, TOY_KINDS } from '../src/game/types.ts'
 
 assert.equal(TOY_KINDS.length, 15, 'the catalog should contain 15 matching toy types')
@@ -7,6 +8,12 @@ assert.deepEqual(
   [...TOY_KINDS].sort(),
   'every toy kind should have a tray definition',
 )
+
+for (const kind of TOY_KINDS) {
+  const icon = new URL(`../public/icons/toys/${kind}.png`, import.meta.url)
+  assert.ok(existsSync(icon), `${kind} should have a rendered tray icon`)
+  assert.ok(statSync(icon).size > 5_000, `${kind} tray icon should not be empty`)
+}
 
 const openingLevels = [1, 2, 3].map((level) => getLevelConfig(level))
 for (const config of openingLevels) {

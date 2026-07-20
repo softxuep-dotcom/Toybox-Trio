@@ -1,5 +1,5 @@
 import type { LevelConfig, ToyKind, TrayEntry } from '../types'
-import { TOY_DEFINITIONS } from '../types'
+import { TOY_DEFINITIONS, TOY_KINDS } from '../types'
 
 export interface UiActions {
   start: () => void
@@ -12,6 +12,9 @@ export interface UiActions {
 }
 
 const isChinese = navigator.language.toLowerCase().startsWith('zh')
+
+const toyIconUrl = (kind: ToyKind): string =>
+  `${import.meta.env.BASE_URL}icons/toys/${kind}.png`
 
 const copy = isChinese
   ? {
@@ -171,6 +174,7 @@ export class GameUI {
     this.pauseButton = this.required<HTMLButtonElement>('#pause-button')
     this.celebration = this.required('#celebration')
     this.bindDomEvents()
+    this.preloadToyIcons()
   }
 
   bind(actions: UiActions): void {
@@ -255,7 +259,7 @@ export class GameUI {
       const definition = TOY_DEFINITIONS[entry.kind]
       slot.dataset.kind = entry.kind
       slot.style.setProperty('--toy-color', definition.color)
-      slot.innerHTML = `<span aria-hidden="true">${definition.icon}</span><i></i>`
+      slot.innerHTML = `<span aria-hidden="true"><img src="${toyIconUrl(entry.kind)}" alt="" draggable="false"></span><i></i>`
       slot.setAttribute('aria-label', definition.label)
       requestAnimationFrame(() => slot.classList.add('filled'))
     })
@@ -334,7 +338,7 @@ export class GameUI {
     burst.style.left = `${x}px`
     burst.style.top = `${y}px`
     burst.style.setProperty('--toy-color', TOY_DEFINITIONS[kind].color)
-    burst.innerHTML = `<strong aria-hidden="true">${TOY_DEFINITIONS[kind].icon}</strong>${Array.from(
+    burst.innerHTML = `<strong aria-hidden="true"><img src="${toyIconUrl(kind)}" alt="" draggable="false"></strong>${Array.from(
       { length: 9 },
       (_, index) => {
         const angle = (index / 9) * Math.PI * 2
@@ -345,6 +349,14 @@ export class GameUI {
     this.traySlotsRoot.append(burst)
     requestAnimationFrame(() => burst.classList.add('active'))
     window.setTimeout(() => burst.remove(), 900)
+  }
+
+  private preloadToyIcons(): void {
+    for (const kind of TOY_KINDS) {
+      const image = new Image()
+      image.decoding = 'async'
+      image.src = toyIconUrl(kind)
+    }
   }
 
   private launchCelebration(): void {
