@@ -26,12 +26,13 @@ export class ToyFactory {
       this.petPrototypes.set(pet, this.createFallbackPet(pet))
     }
 
+    const baseUrl = import.meta.env.BASE_URL
     const requests: ModelRequest[] = [
-      { key: 'car', path: '/models/toy-car-kit/toy-car.glb', type: 'toy' },
-      { key: 'brick', path: '/models/brick-kit/toy-brick.glb', type: 'toy' },
-      { key: 'cat', path: '/models/cube-pets/pet-cat.glb', type: 'pet' },
-      { key: 'bunny', path: '/models/cube-pets/pet-bunny.glb', type: 'pet' },
-      { key: 'panda', path: '/models/cube-pets/pet-panda.glb', type: 'pet' },
+      { key: 'car', path: `${baseUrl}models/toy-car-kit/toy-car.glb`, type: 'toy' },
+      { key: 'brick', path: `${baseUrl}models/brick-kit/toy-brick.glb`, type: 'toy' },
+      { key: 'cat', path: `${baseUrl}models/cube-pets/pet-cat.glb`, type: 'pet' },
+      { key: 'bunny', path: `${baseUrl}models/cube-pets/pet-bunny.glb`, type: 'pet' },
+      { key: 'panda', path: `${baseUrl}models/cube-pets/pet-panda.glb`, type: 'pet' },
     ]
 
     let loadedCount = 0
