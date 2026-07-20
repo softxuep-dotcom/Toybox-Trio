@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "tsx tests/state-smoke.ts && tsx tests/physics-smoke.ts && tsx tests/catalog-smoke.ts"
+    "test": "tsx tests/state-smoke.ts && tsx tests/physics-smoke.ts && tsx tests/catalog-smoke.ts && tsx tests/i18n-smoke.ts && tsx tests/poki-smoke.ts"
   },
   "devDependencies": {
     "@types/three": "^0.185.1",

@@ -26,6 +26,12 @@ npm run preview
 
 构建产物使用相对资源路径，同一份 `dist/` 可部署到 GitHub Pages 的项目子目录，也可直接打包上传 Poki。
 
+## Poki 与多语言
+
+入口页加载 Poki HTML5 SDK v2，游戏会依次发送初始化、加载完成、玩法开始/停止事件，并在开始、重试和下一关等自然节点请求 `commercialBreak`；SDK 缺失、被拦截或初始化失败时仍可正常游玩。
+
+界面按浏览器语言自动支持英语、法语、意大利语、德语、西班牙语、简体中文、日语、韩语、巴西葡语、俄语和土耳其语；未支持的语言回退英语。开发和验收时可使用 `?lang=de` 这类参数切换语言。
+
 ## 资产
 
 精选 GLB 来自 Kenney Cube Pets、Toy Car Kit、Brick Kit、Space Kit 和 Mini Arcade，均为 CC0。许可证副本位于 `public/licenses/`。其余模型和全部音效由代码生成。

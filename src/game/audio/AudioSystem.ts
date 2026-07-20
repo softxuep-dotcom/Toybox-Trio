@@ -16,6 +16,14 @@ export class AudioSystem {
     return this.muted
   }
 
+  suspend(): void {
+    void this.context?.suspend()
+  }
+
+  resume(): void {
+    if (!this.muted) void this.context?.resume()
+  }
+
   pick(): void {
     this.tone(360, 0.055, 'sine', 0.055)
   }

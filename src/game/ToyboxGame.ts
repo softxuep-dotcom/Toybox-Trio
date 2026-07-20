@@ -54,6 +54,7 @@ export class ToyboxGame {
   private playing = false
   private paused = false
   private inputLocked = true
+  private transitionPending = false
   private gesture: PointerGesture | null = null
   private hoveredItem: PileItem | null = null
   private rescuedPet: THREE.Group | null = null
@@ -96,6 +97,7 @@ export class ToyboxGame {
   }
 
   async init(): Promise<void> {
+    await this.poki.init()
     await Promise.all([
       this.physics.init(),
       this.factory.load((progress) => this.ui.setLoading(progress)),
@@ -106,16 +108,20 @@ export class ToyboxGame {
 
   start(): void {
     this.audio.unlock()
-    this.runSeed = createRandomSeed()
-    this.currentLevel = 1
-    this.bankedScore = 0
-    this.startLevel()
+    void this.runAfterCommercialBreak(() => {
+      this.runSeed = createRandomSeed()
+      this.currentLevel = 1
+      this.bankedScore = 0
+      this.startLevel()
+    })
   }
 
   restart(): void {
     this.audio.unlock()
-    this.runSeed = createRandomSeed()
-    this.startLevel()
+    void this.runAfterCommercialBreak(() => {
+      this.runSeed = createRandomSeed()
+      this.startLevel()
+    })
   }
 
   startAt(level: number): void {
@@ -126,9 +132,11 @@ export class ToyboxGame {
   }
 
   next(): void {
-    this.bankedScore += this.completedLevelScore
-    this.currentLevel += 1
-    this.startLevel()
+    void this.runAfterCommercialBreak(() => {
+      this.bankedScore += this.completedLevelScore
+      this.currentLevel += 1
+      this.startLevel()
+    })
   }
 
   toggleSound(): void {
@@ -136,7 +144,7 @@ export class ToyboxGame {
   }
 
   togglePause(): void {
-    if (!this.playing) return
+    if (!this.playing || this.transitionPending) return
     this.paused = !this.paused
     if (this.paused) {
       this.cancelFirstLevelHint()
@@ -174,7 +182,7 @@ export class ToyboxGame {
     if (!this.canInteract() || this.undos <= 0 || !this.state) return
     const entry = this.state.undo()
     if (!entry) {
-      this.ui.showToast('The tray is already empty')
+      this.ui.showTrayEmpty()
       return
     }
 
@@ -483,7 +491,7 @@ export class ToyboxGame {
     canvas.addEventListener('pointerleave', () => this.clearHover())
     canvas.addEventListener('webglcontextlost', (event) => {
       event.preventDefault()
-      this.ui.showToast('Graphics paused — restoring the toybox…', 3000)
+      this.ui.showGraphicsRestoring()
     })
   }
 
@@ -543,7 +551,25 @@ export class ToyboxGame {
   }
 
   private canInteract(): boolean {
-    return this.playing && !this.paused && !this.inputLocked
+    return this.playing && !this.paused && !this.inputLocked && !this.transitionPending
+  }
+
+  private async runAfterCommercialBreak(action: () => void): Promise<void> {
+    if (this.transitionPending) return
+    this.transitionPending = true
+    this.inputLocked = true
+    this.ui.setOverlayActionsEnabled(false)
+    try {
+      await this.poki.commercialBreak(() => {
+        this.poki.gameplayStop()
+        this.audio.suspend()
+      })
+    } finally {
+      this.audio.resume()
+      this.transitionPending = false
+      this.ui.setOverlayActionsEnabled(true)
+    }
+    action()
   }
 
   private scheduleFirstLevelHint(): void {

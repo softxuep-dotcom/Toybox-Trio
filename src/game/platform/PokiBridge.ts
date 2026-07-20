@@ -1,7 +1,9 @@
 interface PokiSdkLike {
+  init?: () => Promise<unknown>
   gameLoadingFinished?: () => void
   gameplayStart?: () => void
   gameplayStop?: () => void
+  commercialBreak?: (onStart?: () => void) => Promise<unknown>
 }
 
 declare global {
@@ -12,6 +14,12 @@ declare global {
 
 export class PokiBridge {
   private playing = false
+  private initialization: Promise<void> | null = null
+
+  init(): Promise<void> {
+    this.initialization ??= this.initialize()
+    return this.initialization
+  }
 
   loadingFinished(): void {
     this.safeCall('gameLoadingFinished')
@@ -29,7 +37,24 @@ export class PokiBridge {
     this.safeCall('gameplayStop')
   }
 
-  private safeCall(name: keyof PokiSdkLike): void {
+  async commercialBreak(onStart?: () => void): Promise<void> {
+    await this.init()
+    try {
+      await window.PokiSDK?.commercialBreak?.(onStart)
+    } catch (error) {
+      console.warn('Poki SDK commercial break failed', error)
+    }
+  }
+
+  private async initialize(): Promise<void> {
+    try {
+      await window.PokiSDK?.init?.()
+    } catch (error) {
+      console.warn('Poki SDK initialization failed; continuing without Poki services', error)
+    }
+  }
+
+  private safeCall(name: 'gameLoadingFinished' | 'gameplayStart' | 'gameplayStop'): void {
     try {
       window.PokiSDK?.[name]?.()
     } catch (error) {

@@ -18,6 +18,13 @@ ui.bind({
   pause: () => game.togglePause(),
 })
 
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === ' ') {
+    event.preventDefault()
+  }
+})
+window.addEventListener('wheel', (event) => event.preventDefault(), { passive: false })
+
 void game
   .init()
   .then(() => {
@@ -27,5 +34,5 @@ void game
   })
   .catch((error: unknown) => {
     console.error('Toybox Trio failed to start', error)
-    ui.showToast('Could not open the toybox. Please refresh.', 6000)
+    ui.showLoadFailed()
   })

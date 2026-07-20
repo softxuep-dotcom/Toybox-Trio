@@ -1,3 +1,4 @@
+import { detectLocale, GAME_COPY } from '../i18n'
 import type { LevelConfig, ToyKind, TrayEntry } from '../types'
 import { TOY_DEFINITIONS, TOY_KINDS } from '../types'
 
@@ -11,50 +12,12 @@ export interface UiActions {
   pause: () => void
 }
 
-const isChinese = navigator.language.toLowerCase().startsWith('zh')
+const locale = detectLocale()
+const copy = GAME_COPY[locale]
+document.documentElement.lang = locale
 
 const toyIconUrl = (kind: ToyKind): string =>
   `${import.meta.env.BASE_URL}icons/toys/${kind}.png`
-
-const copy = isChinese
-  ? {
-      tagline: '翻动玩具箱，凑齐三个相同玩具，救出箱底的小伙伴。',
-      start: '开始整理',
-      loading: '正在打开玩具箱',
-      rescued: '救援成功！',
-      full: '收纳槽满了',
-      retry: '再试一次',
-      next: '下一个玩具箱',
-      pause: '暂停整理',
-      resume: '继续',
-      level: '箱子',
-      remaining: '剩余',
-      score: '得分',
-      tray: '收纳槽 · 三个相同玩具会自动归位',
-      firstLevelHint: '点击车模型，把它放进下方收纳槽',
-      rattle: '抖一抖',
-      undo: '撤回',
-      rescue: '救出',
-    }
-  : {
-      tagline: 'Turn the toy pile, match three of a kind, and rescue the friend underneath.',
-      start: 'Start tidying',
-      loading: 'Opening the toybox',
-      rescued: 'Friend rescued!',
-      full: 'The tray is full',
-      retry: 'Try again',
-      next: 'Next toybox',
-      pause: 'Tidy break',
-      resume: 'Resume',
-      level: 'Box',
-      remaining: 'Left',
-      score: 'Score',
-      tray: 'Tidy tray · Three matching toys pack themselves away',
-      firstLevelHint: 'Tap a car to place it in the tray below',
-      rattle: 'Rattle',
-      undo: 'Undo',
-      rescue: 'Rescue',
-    }
 
 export class GameUI {
   readonly canvas: HTMLCanvasElement
@@ -89,7 +52,7 @@ export class GameUI {
     this.root = root
     root.innerHTML = `
       <main class="game-shell">
-        <canvas id="game-canvas" aria-label="Toybox Trio 3D playfield"></canvas>
+        <canvas id="game-canvas" aria-label="${copy.canvasLabel}"></canvas>
         <div class="scene-vignette" aria-hidden="true"></div>
 
         <header class="hud-top">
@@ -102,25 +65,25 @@ export class GameUI {
             <span><small>${copy.score}</small> <strong id="score-label">0</strong></span>
             <span><small>${copy.remaining}</small> <strong id="remaining-label">0</strong></span>
           </div>
-          <button class="round-button" id="pause-button" type="button" aria-label="Pause">Ⅱ</button>
+          <button class="round-button" id="pause-button" type="button" aria-label="${copy.pauseLabel}">Ⅱ</button>
         </header>
 
         <section class="goal-chip" id="pet-goal" aria-live="polite"></section>
         <div class="progress-track" aria-hidden="true"><div id="progress-bar"></div></div>
 
-        <aside class="tool-rail" aria-label="Toybox tools">
+        <aside class="tool-rail" aria-label="${copy.toolsLabel}">
           <button class="tool-button" id="rattle-button" type="button" aria-label="${copy.rattle}">
             <span aria-hidden="true">🎲</span><b>${copy.rattle}</b><small>2</small>
           </button>
           <button class="tool-button" id="undo-button" type="button" aria-label="${copy.undo}">
             <span aria-hidden="true">↩</span><b>${copy.undo}</b><small>1</small>
           </button>
-          <button class="tool-button compact" id="sound-button" type="button" aria-label="Toggle sound">🔊</button>
+          <button class="tool-button compact" id="sound-button" type="button" aria-label="${copy.soundLabel}">🔊</button>
         </aside>
 
         <div class="hint-toast" id="hint-toast" role="status"></div>
 
-        <section class="tray-panel" aria-label="Collected toys">
+        <section class="tray-panel" aria-label="${copy.trayLabel}">
           <p>${copy.tray}</p>
           <div class="tray-slots" id="tray-slots">
             ${Array.from({ length: 7 }, (_, index) => `<div class="tray-slot" data-slot="${index}"></div>`).join('')}
@@ -132,14 +95,14 @@ export class GameUI {
         <section class="game-overlay visible" id="game-overlay">
           <div class="overlay-card">
             <div class="mini-toys" aria-hidden="true"><span>🧩</span><span>🤖</span><span>🎁</span></div>
-            <p class="overlay-eyebrow" id="overlay-eyebrow">A POCKET-SIZED 3D PUZZLE</p>
+            <p class="overlay-eyebrow" id="overlay-eyebrow">${copy.openingEyebrow}</p>
             <h1 id="overlay-title"><span>TOYBOX</span> TRIO</h1>
             <p class="overlay-copy" id="overlay-copy">${copy.tagline}</p>
             <button class="primary-button" id="primary-button" type="button" disabled>${copy.loading}</button>
             <button class="secondary-button hidden" id="secondary-button" type="button">${copy.retry}</button>
             <div class="loading-row" id="loading-text"><span>${copy.loading}</span><b>0%</b></div>
             <div class="loading-track"><div id="loading-bar"></div></div>
-            <p class="asset-note">Original game · CC0 models by Kenney</p>
+            <p class="asset-note">${copy.assetNote}</p>
           </div>
         </section>
       </main>
@@ -183,7 +146,7 @@ export class GameUI {
 
   showStart(): void {
     this.overlayAction = 'start'
-    this.overlayEyebrow.textContent = 'A POCKET-SIZED 3D PUZZLE'
+    this.overlayEyebrow.textContent = copy.openingEyebrow
     this.overlayTitle.innerHTML = '<span>TOYBOX</span> TRIO'
     this.overlayCopy.textContent = copy.tagline
     this.primaryButton.textContent = copy.start
@@ -191,6 +154,7 @@ export class GameUI {
     this.secondaryButton.classList.add('hidden')
     this.loadingText.classList.add('hidden')
     this.loadingBar.parentElement?.classList.add('hidden')
+    this.setOverlayActionsEnabled(true)
     this.setOverlayVisible(true)
   }
 
@@ -200,25 +164,29 @@ export class GameUI {
 
   showPause(): void {
     this.overlayAction = 'resume'
-    this.overlayEyebrow.textContent = 'PAUSED'
+    this.overlayEyebrow.textContent = copy.pausedEyebrow
     this.overlayTitle.textContent = copy.pause
     this.overlayCopy.textContent = copy.tagline
     this.primaryButton.textContent = copy.resume
     this.secondaryButton.textContent = copy.retry
     this.secondaryButton.classList.remove('hidden')
+    this.setOverlayActionsEnabled(true)
     this.setOverlayVisible(true)
   }
 
   showResult(won: boolean, level: number, score: number, petName: string): void {
     this.overlayAction = won ? 'next' : 'restart'
-    this.overlayEyebrow.textContent = won ? `${petName.toUpperCase()} IS SAFE` : 'ONE MORE TRY'
+    this.overlayEyebrow.textContent = won
+      ? `${copy.safe}: ${petName.toUpperCase()}`
+      : copy.oneMoreTry
     this.overlayTitle.textContent = won ? copy.rescued : copy.full
     this.overlayCopy.textContent = won
-      ? `${copy.level} ${level} · ${copy.score} ${score}`
-      : `${copy.score} ${score} · ${copy.remaining} ${this.remainingLabel.textContent}`
+      ? `${copy.level} ${level} · ${copy.score} ${score.toLocaleString(locale)}`
+      : `${copy.score} ${score.toLocaleString(locale)} · ${copy.remaining} ${this.remainingLabel.textContent}`
     this.primaryButton.textContent = won ? copy.next : copy.retry
     this.secondaryButton.textContent = copy.retry
     this.secondaryButton.classList.toggle('hidden', !won)
+    this.setOverlayActionsEnabled(true)
     this.setOverlayVisible(true)
     if (won) this.launchCelebration()
   }
@@ -233,7 +201,7 @@ export class GameUI {
   }
 
   updateStats(score: number, remaining: number): void {
-    this.scoreLabel.textContent = score.toLocaleString()
+    this.scoreLabel.textContent = score.toLocaleString(locale)
     this.remainingLabel.textContent = String(remaining)
     const progress = Math.max(0, Math.min(1, 1 - remaining / this.totalItems))
     this.progressBar.style.width = `${progress * 100}%`
@@ -306,6 +274,23 @@ export class GameUI {
 
   showFirstLevelHint(): void {
     this.showToast(copy.firstLevelHint, 3200)
+  }
+
+  showTrayEmpty(): void {
+    this.showToast(copy.trayEmpty)
+  }
+
+  showGraphicsRestoring(): void {
+    this.showToast(copy.graphicsRestoring, 3000)
+  }
+
+  showLoadFailed(): void {
+    this.showToast(copy.loadFailed, 6000)
+  }
+
+  setOverlayActionsEnabled(enabled: boolean): void {
+    this.primaryButton.disabled = !enabled
+    this.secondaryButton.disabled = !enabled
   }
 
   hideToast(): void {
