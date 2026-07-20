@@ -1,0 +1,631 @@
+import * as THREE from 'three'
+import { AudioSystem } from './audio/AudioSystem'
+import { PokiBridge } from './platform/PokiBridge'
+import { ToyFactory } from './render/ToyFactory'
+import { easing, TweenSystem } from './render/TweenSystem'
+import { GameState } from './simulation/GameState'
+import type { LevelConfig, SelectionResult, ToyKind, TrayEntry } from './types'
+import { getLevelConfig } from './types'
+import type { GameUI } from './ui/GameUI'
+
+interface PileItem {
+  id: string
+  kind: ToyKind
+  object: THREE.Group
+  selected: boolean
+  removed: boolean
+}
+
+interface PointerGesture {
+  pointerId: number
+  startX: number
+  startY: number
+  previousX: number
+  previousY: number
+  dragged: boolean
+}
+
+const pileCenter = new THREE.Vector3(0, 1.15, 0)
+
+export class ToyboxGame {
+  private readonly ui: GameUI
+  private readonly renderer: THREE.WebGLRenderer
+  private readonly scene = new THREE.Scene()
+  private readonly camera = new THREE.PerspectiveCamera(36, 1, 0.1, 80)
+  private readonly pileRoot = new THREE.Group()
+  private readonly environmentRoot = new THREE.Group()
+  private readonly raycaster = new THREE.Raycaster()
+  private readonly pointer = new THREE.Vector2()
+  private readonly tweens = new TweenSystem()
+  private readonly factory = new ToyFactory()
+  private readonly audio = new AudioSystem()
+  private readonly poki = new PokiBridge()
+  private readonly items = new Map<string, PileItem>()
+  private state: GameState | null = null
+  private config: LevelConfig = getLevelConfig(1)
+  private currentLevel = 1
+  private bankedScore = 0
+  private completedLevelScore = 0
+  private rattles = 0
+  private undos = 0
+  private playing = false
+  private paused = false
+  private inputLocked = true
+  private gesture: PointerGesture | null = null
+  private hoveredItem: PileItem | null = null
+  private rescuedPet: THREE.Group | null = null
+  private elapsed = 0
+  private lastFrameTime = performance.now()
+
+  constructor(canvas: HTMLCanvasElement, ui: GameUI) {
+    this.ui = ui
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance',
+    })
+    const lowPower = window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 720
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.25 : 1.65))
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.08
+    this.renderer.shadowMap.enabled = !lowPower
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.scene.add(this.environmentRoot, this.pileRoot)
+    this.createEnvironment()
+    this.createLights()
+    this.bindInput(canvas)
+    this.resize()
+    new ResizeObserver(() => this.resize()).observe(canvas.parentElement ?? canvas)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.playing && !this.paused) this.togglePause()
+    })
+    this.renderer.setAnimationLoop(() => this.animate())
+  }
+
+  async init(): Promise<void> {
+    await this.factory.load((progress) => this.ui.setLoading(progress))
+    this.poki.loadingFinished()
+    this.ui.showStart()
+  }
+
+  start(): void {
+    this.audio.unlock()
+    this.currentLevel = 1
+    this.bankedScore = 0
+    this.startLevel()
+  }
+
+  restart(): void {
+    this.audio.unlock()
+    this.startLevel()
+  }
+
+  next(): void {
+    this.bankedScore += this.completedLevelScore
+    this.currentLevel += 1
+    this.startLevel()
+  }
+
+  toggleSound(): void {
+    this.ui.setMuted(this.audio.toggle())
+  }
+
+  togglePause(): void {
+    if (!this.playing) return
+    this.paused = !this.paused
+    if (this.paused) {
+      this.poki.gameplayStop()
+      this.ui.showPause()
+      this.ui.setToolsEnabled(false)
+    } else {
+      this.poki.gameplayStart()
+      this.ui.hideOverlay()
+      this.ui.setToolsEnabled(true)
+    }
+  }
+
+  rattle(): void {
+    if (!this.canInteract() || this.rattles <= 0 || !this.state) return
+    this.rattles -= 1
+    this.inputLocked = true
+    this.audio.rattle()
+    this.ui.setToolCounts(this.rattles, this.undos)
+    const remaining = [...this.items.values()].filter((item) => !item.selected && !item.removed)
+    const random = mulberry32(this.currentLevel * 711 + this.state.remaining * 17 + this.rattles)
+    const startRotation = this.pileRoot.rotation.y
+    this.tweens.add({
+      duration: 0.72,
+      ease: easing.inOutCubic,
+      update: (progress) => {
+        this.pileRoot.rotation.y = startRotation + Math.PI * 2 * progress
+      },
+      complete: () => {
+        this.pileRoot.rotation.y %= Math.PI * 2
+        this.inputLocked = false
+      },
+    })
+    remaining.forEach((item, index) => {
+      const start = item.object.position.clone()
+      const target = this.pilePosition(index, remaining.length, random, false)
+      this.tweens.add({
+        duration: 0.58,
+        delay: index * 0.002,
+        ease: easing.inOutCubic,
+        update: (progress) => item.object.position.lerpVectors(start, target, progress),
+      })
+    })
+  }
+
+  undo(): void {
+    if (!this.canInteract() || this.undos <= 0 || !this.state) return
+    const entry = this.state.undo()
+    if (!entry) {
+      this.ui.showToast('The tray is already empty')
+      return
+    }
+
+    const item = this.items.get(entry.id)
+    if (!item) return
+    this.undos -= 1
+    this.audio.undo()
+    this.ui.setToolCounts(this.rattles, this.undos)
+    this.ui.renderTray(this.state.tray)
+    this.ui.updateStats(this.bankedScore + this.state.score, this.state.remaining)
+    item.selected = false
+    item.removed = false
+    item.object.visible = true
+    this.pileRoot.attach(item.object)
+    item.object.scale.setScalar(0.92)
+    const random = mulberry32(this.currentLevel * 991 + this.state.remaining)
+    const target = new THREE.Vector3(
+      (random() - 0.5) * 2.2,
+      3.7 + random() * 0.5,
+      (random() - 0.5) * 1.2,
+    )
+    item.object.position.copy(target).add(new THREE.Vector3(0, 1.2, 0))
+    const start = item.object.position.clone()
+    this.tweens.add({
+      duration: 0.42,
+      ease: easing.outBack,
+      update: (progress) => item.object.position.lerpVectors(start, target, progress),
+    })
+  }
+
+  private startLevel(): void {
+    this.clearLevel()
+    this.config = getLevelConfig(this.currentLevel)
+    this.rattles = this.config.rattles
+    this.undos = this.config.undos
+    this.completedLevelScore = 0
+    this.elapsed = 0
+    const deck = this.createDeck(this.config)
+    this.state = new GameState(deck)
+    this.ui.setLevel(this.config, deck.length)
+    this.ui.renderTray([])
+    this.ui.updateStats(this.bankedScore, deck.length)
+    this.createPile(deck)
+    this.playing = true
+    this.paused = false
+    this.inputLocked = false
+    this.ui.hideOverlay()
+    this.ui.setToolsEnabled(true)
+    this.poki.gameplayStart()
+    if (this.currentLevel === 1) this.ui.showTutorial()
+  }
+
+  private createDeck(config: LevelConfig): TrayEntry[] {
+    const deck: TrayEntry[] = []
+    let id = 0
+    for (const kind of config.kinds) {
+      for (let copyIndex = 0; copyIndex < config.copiesPerKind; copyIndex += 1) {
+        deck.push({ id: `level-${config.number}-toy-${id}`, kind })
+        id += 1
+      }
+    }
+
+    const random = mulberry32(config.number * 92821 + 41)
+    shuffle(deck, random)
+    const tutorialKind = config.kinds[0]
+    const tutorialEntries = deck.filter((entry) => entry.kind === tutorialKind).slice(0, 3)
+    tutorialEntries.forEach((entry, index) => {
+      const currentIndex = deck.indexOf(entry)
+      const targetIndex = deck.length - 3 + index
+      ;[deck[currentIndex], deck[targetIndex]] = [deck[targetIndex], deck[currentIndex]]
+    })
+    return deck
+  }
+
+  private createPile(deck: TrayEntry[]): void {
+    const random = mulberry32(this.currentLevel * 5527 + 97)
+    deck.forEach((entry, index) => {
+      const object = this.factory.createToy(entry.kind)
+      const targetScale = 0.92
+      object.position.copy(this.pilePosition(index, deck.length, random, true))
+      object.rotation.set(
+        (random() - 0.5) * 1.2,
+        random() * Math.PI * 2,
+        (random() - 0.5) * 1.2,
+      )
+      object.scale.setScalar(0.001)
+      object.userData.itemId = entry.id
+      object.traverse((child) => {
+        child.userData.itemId = entry.id
+      })
+      const item: PileItem = {
+        id: entry.id,
+        kind: entry.kind,
+        object,
+        selected: false,
+        removed: false,
+      }
+      this.items.set(entry.id, item)
+      this.pileRoot.add(object)
+      this.tweens.add({
+        duration: 0.42,
+        delay: Math.min(index * 0.012, 0.42),
+        ease: easing.outBack,
+        update: (progress) => object.scale.setScalar(Math.max(0.001, targetScale * progress)),
+      })
+    })
+  }
+
+  private pilePosition(
+    index: number,
+    total: number,
+    random: () => number,
+    exposeTriple: boolean,
+  ): THREE.Vector3 {
+    if (exposeTriple && index >= total - 3) {
+      return new THREE.Vector3((index - (total - 2)) * 1.35, 3.95, 0.75)
+    }
+    const perLayer = 12
+    const layer = Math.floor(index / perLayer)
+    const slot = index % perLayer
+    const angle = (slot / perLayer) * Math.PI * 2 + layer * 0.47
+    const radius = 2.15 + (random() - 0.5) * 0.65
+    return new THREE.Vector3(
+      Math.cos(angle) * radius + (random() - 0.5) * 0.55,
+      0.5 + layer * 0.67 + random() * 0.13,
+      Math.sin(angle) * radius * 0.72 + (random() - 0.5) * 0.42,
+    )
+  }
+
+  private selectItem(item: PileItem): void {
+    if (!this.canInteract() || !this.state || item.selected || item.removed) return
+    const result = this.state.select(item.id)
+    if (!result) return
+
+    this.inputLocked = true
+    item.selected = true
+    this.clearHover()
+    this.audio.pick()
+    this.ui.renderTray(result.preResolutionTray)
+    this.ui.updateStats(this.bankedScore + result.score, result.remaining)
+    const trayIndex = Math.max(0, result.preResolutionTray.findIndex((entry) => entry.id === item.id))
+    const slot = this.ui.getTraySlotCenter(trayIndex)
+    const targetPosition = this.screenPointToWorld(slot.x, slot.y, 8.2)
+    this.scene.attach(item.object)
+    const startPosition = item.object.position.clone()
+    const startScale = item.object.scale.clone()
+    const targetScale = startScale.clone().multiplyScalar(0.48)
+    const startQuaternion = item.object.quaternion.clone()
+    const targetQuaternion = new THREE.Quaternion()
+
+    this.tweens.add({
+      duration: 0.24,
+      ease: easing.outCubic,
+      update: (progress) => {
+        item.object.position.lerpVectors(startPosition, targetPosition, progress)
+        item.object.scale.lerpVectors(startScale, targetScale, progress)
+        item.object.quaternion.slerpQuaternions(startQuaternion, targetQuaternion, progress)
+      },
+      complete: () => {
+        item.object.visible = false
+        if (result.matched.length > 0) this.resolveMatch(result)
+        else this.completeSelection(result)
+      },
+    })
+  }
+
+  private resolveMatch(result: SelectionResult): void {
+    const kind = result.matched[0].kind
+    this.ui.flashMatch(kind)
+    this.audio.match(result.combo)
+    for (const entry of result.matched) {
+      const matchedItem = this.items.get(entry.id)
+      if (matchedItem) matchedItem.removed = true
+    }
+    this.tweens.add({
+      duration: 0.24,
+      update: () => undefined,
+      complete: () => {
+        this.ui.renderTray(result.tray)
+        this.completeSelection(result)
+      },
+    })
+  }
+
+  private completeSelection(result: SelectionResult): void {
+    if (result.won) {
+      this.finishLevel(true)
+      return
+    }
+    if (result.lost) {
+      this.finishLevel(false)
+      return
+    }
+    this.inputLocked = false
+  }
+
+  private finishLevel(won: boolean): void {
+    if (!this.state) return
+    this.playing = false
+    this.inputLocked = true
+    this.completedLevelScore = this.state.score
+    this.poki.gameplayStop()
+    this.ui.setToolsEnabled(false)
+    const totalScore = this.bankedScore + this.completedLevelScore
+    this.saveBest(totalScore)
+
+    if (won) {
+      this.audio.win()
+      this.revealPet()
+      this.tweens.add({
+        duration: 0.72,
+        update: () => undefined,
+        complete: () =>
+          this.ui.showResult(true, this.currentLevel, totalScore, this.config.petName),
+      })
+    } else {
+      this.audio.lose()
+      this.tweens.add({
+        duration: 0.28,
+        update: () => undefined,
+        complete: () =>
+          this.ui.showResult(false, this.currentLevel, totalScore, this.config.petName),
+      })
+    }
+  }
+
+  private revealPet(): void {
+    const pet = this.factory.createPet(this.config.petModel)
+    pet.position.set(0, 0.75, 0)
+    pet.rotation.y = -0.25
+    pet.scale.setScalar(0.001)
+    this.scene.add(pet)
+    this.rescuedPet = pet
+    this.tweens.add({
+      duration: 0.62,
+      ease: easing.outBack,
+      update: (progress) => pet.scale.setScalar(Math.max(0.001, progress)),
+    })
+  }
+
+  private bindInput(canvas: HTMLCanvasElement): void {
+    canvas.addEventListener('pointerdown', (event) => {
+      if (!this.canInteract()) return
+      canvas.setPointerCapture(event.pointerId)
+      this.gesture = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        previousX: event.clientX,
+        previousY: event.clientY,
+        dragged: false,
+      }
+    })
+
+    canvas.addEventListener('pointermove', (event) => {
+      if (this.gesture?.pointerId === event.pointerId) {
+        const totalDistance = Math.hypot(
+          event.clientX - this.gesture.startX,
+          event.clientY - this.gesture.startY,
+        )
+        if (totalDistance > 7) this.gesture.dragged = true
+        if (this.gesture.dragged) {
+          const deltaX = event.clientX - this.gesture.previousX
+          this.pileRoot.rotation.y += deltaX * 0.009
+          this.clearHover()
+        }
+        this.gesture.previousX = event.clientX
+        this.gesture.previousY = event.clientY
+      } else if (event.pointerType === 'mouse' && this.canInteract()) {
+        this.updateHover(event.clientX, event.clientY)
+      }
+    })
+
+    canvas.addEventListener('pointerup', (event) => {
+      if (!this.gesture || this.gesture.pointerId !== event.pointerId) return
+      if (!this.gesture.dragged) {
+        const item = this.pick(event.clientX, event.clientY)
+        if (item) this.selectItem(item)
+      }
+      this.gesture = null
+    })
+
+    canvas.addEventListener('pointercancel', () => {
+      this.gesture = null
+    })
+    canvas.addEventListener('pointerleave', () => this.clearHover())
+    canvas.addEventListener('webglcontextlost', (event) => {
+      event.preventDefault()
+      this.ui.showToast('Graphics paused — restoring the toybox…', 3000)
+    })
+  }
+
+  private updateHover(clientX: number, clientY: number): void {
+    const next = this.pick(clientX, clientY)
+    if (next === this.hoveredItem) return
+    this.clearHover()
+    if (!next) return
+    this.hoveredItem = next
+    this.setGlow(next.object, true)
+    this.renderer.domElement.classList.add('is-hovering')
+  }
+
+  private clearHover(): void {
+    if (this.hoveredItem) this.setGlow(this.hoveredItem.object, false)
+    this.hoveredItem = null
+    this.renderer.domElement.classList.remove('is-hovering')
+  }
+
+  private setGlow(object: THREE.Object3D, enabled: boolean): void {
+    object.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const material of materials) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue
+        material.emissive.set(enabled ? '#8877ff' : '#000000')
+        material.emissiveIntensity = enabled ? 0.18 : 0
+      }
+    })
+  }
+
+  private pick(clientX: number, clientY: number): PileItem | null {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    this.pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1
+    this.pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1
+    this.raycaster.setFromCamera(this.pointer, this.camera)
+    const candidates = [...this.items.values()]
+      .filter((item) => !item.selected && !item.removed && item.object.visible)
+      .map((item) => item.object)
+    const intersection = this.raycaster.intersectObjects(candidates, true)[0]
+    if (!intersection) return null
+    let object: THREE.Object3D | null = intersection.object
+    while (object && !object.userData.itemId) object = object.parent
+    return object?.userData.itemId ? (this.items.get(String(object.userData.itemId)) ?? null) : null
+  }
+
+  private screenPointToWorld(clientX: number, clientY: number, distance: number): THREE.Vector3 {
+    const rect = this.renderer.domElement.getBoundingClientRect()
+    const point = new THREE.Vector3(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1,
+      0.25,
+    ).unproject(this.camera)
+    return this.camera.position
+      .clone()
+      .add(point.sub(this.camera.position).normalize().multiplyScalar(distance))
+  }
+
+  private canInteract(): boolean {
+    return this.playing && !this.paused && !this.inputLocked
+  }
+
+  private clearLevel(): void {
+    this.tweens.clear()
+    this.clearHover()
+    for (const item of this.items.values()) item.object.removeFromParent()
+    this.items.clear()
+    this.rescuedPet?.removeFromParent()
+    this.rescuedPet = null
+    this.pileRoot.rotation.set(0, 0, 0)
+    this.state = null
+  }
+
+  private createEnvironment(): void {
+    const baseMaterial = new THREE.MeshStandardMaterial({
+      color: '#6758b7',
+      roughness: 0.66,
+      metalness: 0,
+    })
+    const innerMaterial = new THREE.MeshStandardMaterial({
+      color: '#dad3ff',
+      roughness: 0.82,
+    })
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.42, 6.2), baseMaterial)
+    floor.position.y = -0.72
+    floor.receiveShadow = true
+    const inset = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.12, 5.5), innerMaterial)
+    inset.position.y = -0.45
+    inset.receiveShadow = true
+    this.environmentRoot.add(floor, inset)
+
+    const wallGeometryX = new THREE.BoxGeometry(0.35, 1.2, 6.4)
+    const wallGeometryZ = new THREE.BoxGeometry(8.2, 1.2, 0.35)
+    const leftWall = new THREE.Mesh(wallGeometryX, baseMaterial)
+    leftWall.position.set(-4.08, -0.08, 0)
+    const rightWall = leftWall.clone()
+    rightWall.position.x = 4.08
+    const backWall = new THREE.Mesh(wallGeometryZ, baseMaterial)
+    backWall.position.set(0, -0.08, -3.08)
+    this.environmentRoot.add(leftWall, rightWall, backWall)
+
+    const table = new THREE.Mesh(
+      new THREE.CylinderGeometry(7.2, 7.6, 0.72, 48),
+      new THREE.MeshStandardMaterial({ color: '#f3c98b', roughness: 0.72 }),
+    )
+    table.position.y = -1.23
+    table.receiveShadow = true
+    this.environmentRoot.add(table)
+  }
+
+  private createLights(): void {
+    const hemisphere = new THREE.HemisphereLight('#f8fbff', '#64508d', 2.45)
+    const key = new THREE.DirectionalLight('#fff3dd', 3.15)
+    key.position.set(-5, 10, 8)
+    key.castShadow = true
+    key.shadow.mapSize.set(1024, 1024)
+    key.shadow.camera.left = -7
+    key.shadow.camera.right = 7
+    key.shadow.camera.top = 7
+    key.shadow.camera.bottom = -7
+    key.shadow.bias = -0.0006
+    const fill = new THREE.DirectionalLight('#809cff', 1.1)
+    fill.position.set(6, 5, -6)
+    this.scene.add(hemisphere, key, fill)
+  }
+
+  private resize(): void {
+    const width = this.renderer.domElement.clientWidth || window.innerWidth
+    const height = this.renderer.domElement.clientHeight || window.innerHeight
+    this.renderer.setSize(width, height, false)
+    this.camera.aspect = width / Math.max(height, 1)
+    const portrait = width / Math.max(height, 1) < 0.82
+    this.camera.position.set(0, portrait ? 13.8 : 10.6, portrait ? 18.5 : 14.2)
+    this.camera.lookAt(portrait ? new THREE.Vector3(0, 1.25, 0.2) : pileCenter)
+    this.camera.updateProjectionMatrix()
+  }
+
+  private animate(): void {
+    const now = performance.now()
+    const delta = Math.min((now - this.lastFrameTime) / 1000, 0.05)
+    this.lastFrameTime = now
+    if (!this.paused) {
+      this.elapsed += delta
+      this.tweens.update(delta)
+      if (this.rescuedPet) {
+        this.rescuedPet.position.y = 0.78 + Math.sin(this.elapsed * 3.2) * 0.08
+        this.rescuedPet.rotation.y += delta * 0.45
+      }
+    }
+    this.renderer.render(this.scene, this.camera)
+  }
+
+  private saveBest(score: number): void {
+    try {
+      const best = Number(localStorage.getItem('toybox-trio-best') ?? 0)
+      if (score > best) localStorage.setItem('toybox-trio-best', String(score))
+    } catch {
+      // Private browsing can disable storage; gameplay must continue regardless.
+    }
+  }
+}
+
+function mulberry32(seed: number): () => number {
+  return () => {
+    let value = (seed += 0x6d2b79f5)
+    value = Math.imul(value ^ (value >>> 15), value | 1)
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function shuffle<T>(items: T[], random: () => number): void {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(random() * (index + 1))
+    ;[items[index], items[other]] = [items[other], items[index]]
+  }
+}
