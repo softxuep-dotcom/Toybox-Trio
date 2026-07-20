@@ -4,21 +4,21 @@
 
 | # | 玩具 | 代码 ID | 游戏模型 | 来源与许可 | 首次出现 |
 | ---: | --- | --- | --- | --- | --- |
-| 1 | 弹力球 | `ball` | 程序化球体与装饰环 | 项目原创 | Box 1 |
+| 1 | 弹力球 | `ball` | 程序化球体与装饰环 | 项目原创 | Box 2 |
 | 2 | 玩具赛车 | `car` | GLB | Kenney Toy Car Kit，CC0 | Box 1 |
-| 3 | 拼搭积木 | `brick` | GLB | Kenney Brick Kit，CC0 | Box 1 |
-| 4 | 口袋火箭 | `rocket` | 程序化圆柱、圆锥与尾翼 | 项目原创 | Box 1 |
-| 5 | 陀螺 | `top` | 程序化圆锥、圆环与手柄 | 项目原创 | Box 1 |
-| 6 | 礼物盒 | `gift` | 程序化盒体、缎带与蝴蝶结 | 项目原创 | Box 1 |
-| 7 | 小机器人 | `robot` | 程序化盒体、胶囊体与球体 | 项目原创 | Box 2 |
-| 8 | 玩具鼓 | `drum` | 程序化圆柱与圆环 | 项目原创 | Box 2 |
-| 9 | 发光星星 | `star` | 程序化挤压星形 | 项目原创 | Box 2 |
-| 10 | 太空赛车 | `spaceship` | GLB | Kenney Space Kit，CC0 | Box 2 |
-| 11 | 月球车 | `rover` | GLB | Kenney Space Kit，CC0 | Box 2 |
-| 12 | 口袋外星人 | `alien` | GLB | Kenney Space Kit，CC0 | Box 2 |
-| 13 | 迷你街机 | `arcade` | GLB | Kenney Mini Arcade，CC0 | Box 3 |
-| 14 | 抓娃娃机 | `claw` | GLB | Kenney Mini Arcade，CC0 | Box 3 |
-| 15 | 怪兽卡车 | `monster` | GLB | Kenney Toy Car Kit，CC0 | Box 2 |
+| 3 | 拼搭积木 | `brick` | GLB | Kenney Brick Kit，CC0 | Box 2 |
+| 4 | 口袋火箭 | `rocket` | 程序化圆柱、圆锥与尾翼 | 项目原创 | Box 2 |
+| 5 | 陀螺 | `top` | 程序化圆锥、圆环与手柄 | 项目原创 | Box 2 |
+| 6 | 礼物盒 | `gift` | 程序化盒体、缎带与蝴蝶结 | 项目原创 | Box 2 |
+| 7 | 小机器人 | `robot` | 程序化盒体、胶囊体与球体 | 项目原创 | Box 3 |
+| 8 | 玩具鼓 | `drum` | 程序化圆柱与圆环 | 项目原创 | Box 3 |
+| 9 | 发光星星 | `star` | 程序化挤压星形 | 项目原创 | Box 3 |
+| 10 | 太空赛车 | `spaceship` | GLB | Kenney Space Kit，CC0 | Box 3 |
+| 11 | 月球车 | `rover` | GLB | Kenney Space Kit，CC0 | Box 3 |
+| 12 | 口袋外星人 | `alien` | GLB | Kenney Space Kit，CC0 | Box 3 |
+| 13 | 迷你街机 | `arcade` | GLB | Kenney Mini Arcade，CC0 | Box 4 |
+| 14 | 抓娃娃机 | `claw` | GLB | Kenney Mini Arcade，CC0 | Box 4 |
+| 15 | 怪兽卡车 | `monster` | GLB | Kenney Toy Car Kit，CC0 | Box 3 |
 
 ## 奖励宠物
 
@@ -30,10 +30,11 @@
 
 ## 关卡轮换
 
-- Box 1：6 类基础玩具，用弹力球和赛车完成两组三消教学。
-- Box 2：7 类中后期与太空玩具，立即展示新增资产。
-- Box 3：9 类玩具，加入迷你街机和抓娃娃机。
-- Box 4 起：从完整 15 类库中每关轮换 9 类，维持 54 件规模，不让物理堆无限膨胀。
+- Box 1：仅 3 辆玩具赛车；长时间未选择时显示点击提示，完成一次三消即通关。
+- Box 2：6 类基础玩具，共 36 件，进入正式玩法。
+- Box 3：7 类机器人、太空和车辆玩具，共 42 件。
+- Box 4：9 类玩具，共 54 件，加入迷你街机和抓娃娃机。
+- Box 5 起：从完整 15 类库中每关轮换 9 类，维持 54 件规模，不让物理堆无限膨胀。
 
 ## 包体与许可证
 

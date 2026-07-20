@@ -329,7 +329,7 @@ button:focus-visible {
   font-size: 1.15rem;
 }
 
-.tutorial-toast {
+.hint-toast {
   position: absolute;
   z-index: 7;
   top: 135px;
@@ -350,7 +350,7 @@ button:focus-visible {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.tutorial-toast.visible {
+.hint-toast.visible {
   opacity: 1;
   transform: translate(-50%, 0);
 }
@@ -838,7 +838,7 @@ button:focus-visible {
     min-height: 45px;
   }
 
-  .tutorial-toast {
+  .hint-toast {
     top: 105px;
     font-size: 0.68rem;
   }

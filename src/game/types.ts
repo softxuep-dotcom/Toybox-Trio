@@ -68,8 +68,9 @@ export interface LevelConfig {
   undos: number
 }
 
-const LEVEL_ONE_KINDS: ToyKind[] = ['ball', 'car', 'brick', 'rocket', 'top', 'gift']
-const LEVEL_TWO_KINDS: ToyKind[] = [
+const TUTORIAL_LEVEL_KINDS: ToyKind[] = ['car']
+const LEVEL_TWO_KINDS: ToyKind[] = ['ball', 'car', 'brick', 'rocket', 'top', 'gift']
+const LEVEL_THREE_KINDS: ToyKind[] = [
   'robot',
   'drum',
   'star',
@@ -78,7 +79,7 @@ const LEVEL_TWO_KINDS: ToyKind[] = [
   'alien',
   'monster',
 ]
-const LEVEL_THREE_KINDS: ToyKind[] = [
+const LEVEL_FOUR_KINDS: ToyKind[] = [
   'arcade',
   'claw',
   'spaceship',
@@ -99,26 +100,28 @@ export function getLevelConfig(level: number): LevelConfig {
   const pet = pets[(level - 1) % pets.length]
   const kinds =
     level === 1
-      ? LEVEL_ONE_KINDS
+      ? TUTORIAL_LEVEL_KINDS
       : level === 2
         ? LEVEL_TWO_KINDS
         : level === 3
           ? LEVEL_THREE_KINDS
-          : rotatingKinds(level, 9)
+          : level === 4
+            ? LEVEL_FOUR_KINDS
+            : rotatingKinds(level, 9)
 
   return {
     number: level,
     kinds: [...kinds],
-    copiesPerKind: 6,
+    copiesPerKind: level === 1 ? 3 : 6,
     petModel: pet.petModel,
     petName: pet.petName,
-    rattles: level === 1 ? 2 : 1,
-    undos: 1,
+    rattles: level === 1 ? 0 : 1,
+    undos: level === 1 ? 0 : 1,
   }
 }
 
 function rotatingKinds(level: number, count: number): ToyKind[] {
   const start =
-    (((level - 4) * 5) % TOY_KINDS.length + TOY_KINDS.length) % TOY_KINDS.length
+    (((level - 5) * 5) % TOY_KINDS.length + TOY_KINDS.length) % TOY_KINDS.length
   return Array.from({ length: count }, (_, index) => TOY_KINDS[(start + index) % TOY_KINDS.length])
 }

@@ -31,10 +31,7 @@ const copy = isChinese
       remaining: '剩余',
       score: '得分',
       tray: '收纳槽 · 三个相同玩具会自动归位',
-      tutorial: '点击玩具来收集 · 拖动画面旋转玩具堆',
-      tutorialGroup: (group: number, collected: number) =>
-        `教学 ${group}/2 · 点击发光黑边玩具（${collected}/3）`,
-      tutorialDone: '就是这样！三个相同玩具会自动消除',
+      firstLevelHint: '点击车模型，把它放进下方收纳槽',
       rattle: '抖一抖',
       undo: '撤回',
       rescue: '救出',
@@ -53,10 +50,7 @@ const copy = isChinese
       remaining: 'Left',
       score: 'Score',
       tray: 'Tidy tray · Three matching toys pack themselves away',
-      tutorial: 'Tap a toy to collect it · Drag to turn the pile',
-      tutorialGroup: (group: number, collected: number) =>
-        `Tutorial ${group}/2 · Tap the glowing outlined toys (${collected}/3)`,
-      tutorialDone: 'That’s it! Three matching toys clear automatically',
+      firstLevelHint: 'Tap a car to place it in the tray below',
       rattle: 'Rattle',
       undo: 'Undo',
       rescue: 'Rescue',
@@ -124,7 +118,7 @@ export class GameUI {
           <button class="tool-button compact" id="sound-button" type="button" aria-label="Toggle sound">🔊</button>
         </aside>
 
-        <div class="tutorial-toast" id="tutorial-toast" role="status"></div>
+        <div class="hint-toast" id="hint-toast" role="status"></div>
 
         <section class="tray-panel" aria-label="Collected toys">
           <p>${copy.tray}</p>
@@ -165,7 +159,7 @@ export class GameUI {
     this.remainingLabel = this.required('#remaining-label')
     this.progressBar = this.required('#progress-bar')
     this.petGoal = this.required('#pet-goal')
-    this.toast = this.required('#tutorial-toast')
+    this.toast = this.required('#hint-toast')
     this.traySlotsRoot = this.required('#tray-slots')
     this.traySlots = Array.from(root.querySelectorAll<HTMLElement>('.tray-slot'))
     this.rattleButton = this.required<HTMLButtonElement>('#rattle-button')
@@ -310,16 +304,14 @@ export class GameUI {
     this.soundButton.textContent = muted ? '🔇' : '🔊'
   }
 
-  showTutorial(): void {
-    this.showToast(copy.tutorial, 4800)
+  showFirstLevelHint(): void {
+    this.showToast(copy.firstLevelHint, 3200)
   }
 
-  showTutorialStep(group: 1 | 2, collected: number): void {
-    this.showToast(copy.tutorialGroup(group, collected), 0)
-  }
-
-  showTutorialComplete(): void {
-    this.showToast(copy.tutorialDone, 3200)
+  hideToast(): void {
+    window.clearTimeout(this.toastTimer)
+    this.toast.classList.remove('visible')
+    this.toast.textContent = ''
   }
 
   showToast(message: string, duration = 1800): void {

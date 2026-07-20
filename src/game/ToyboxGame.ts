@@ -27,6 +27,7 @@ interface PointerGesture {
 }
 
 const pileCenter = new THREE.Vector3(0, 1.15, 0)
+const FIRST_LEVEL_HINT_DELAY_MS = 5_000
 
 export class ToyboxGame {
   private readonly ui: GameUI
@@ -42,12 +43,6 @@ export class ToyboxGame {
   private readonly physics = new PilePhysics()
   private readonly audio = new AudioSystem()
   private readonly poki = new PokiBridge()
-  private readonly tutorialOutlineMaterial = new THREE.MeshBasicMaterial({
-    color: '#171226',
-    side: THREE.BackSide,
-    depthWrite: false,
-    toneMapped: false,
-  })
   private readonly items = new Map<string, PileItem>()
   private state: GameState | null = null
   private config: LevelConfig = getLevelConfig(1)
@@ -64,8 +59,8 @@ export class ToyboxGame {
   private rescuedPet: THREE.Group | null = null
   private runSeed = createRandomSeed()
   private levelSeed = 0
-  private tutorialGroups: string[][] = []
-  private tutorialGroupIndex = -1
+  private firstLevelHintTimer = 0
+  private firstLevelSelectionMade = false
   private elapsed = 0
   private cameraYaw = 0
   private cameraHeight = 10.6
@@ -144,6 +139,7 @@ export class ToyboxGame {
     if (!this.playing) return
     this.paused = !this.paused
     if (this.paused) {
+      this.cancelFirstLevelHint()
       this.poki.gameplayStop()
       this.ui.showPause()
       this.ui.setToolsEnabled(false)
@@ -151,6 +147,7 @@ export class ToyboxGame {
       this.poki.gameplayStart()
       this.ui.hideOverlay()
       this.ui.setToolsEnabled(true)
+      this.scheduleFirstLevelHint()
     }
   }
 
@@ -208,10 +205,6 @@ export class ToyboxGame {
       spawnPosition,
       item.object.quaternion,
     )
-    if (this.currentTutorialGroup()?.includes(item.id)) {
-      this.setTutorialHighlight(item.object, true)
-      this.showTutorialProgress()
-    }
   }
 
   private startLevel(): void {
@@ -220,6 +213,7 @@ export class ToyboxGame {
     this.rattles = this.config.rattles
     this.undos = this.config.undos
     this.completedLevelScore = 0
+    this.firstLevelSelectionMade = false
     this.elapsed = 0
     this.levelSeed = mixSeed(this.runSeed, this.currentLevel)
     const deck = this.createDeck(this.config)
@@ -238,7 +232,10 @@ export class ToyboxGame {
       duration: 0.95,
       update: () => undefined,
       complete: () => {
-        if (this.playing && !this.paused) this.inputLocked = false
+        if (this.playing && !this.paused) {
+          this.inputLocked = false
+          this.scheduleFirstLevelHint()
+        }
       },
     })
   }
@@ -255,22 +252,6 @@ export class ToyboxGame {
 
     const random = mulberry32((this.levelSeed ^ 0x6ac690c5) >>> 0)
     shuffle(deck, random)
-
-    this.tutorialGroups = []
-    this.tutorialGroupIndex = -1
-    if (config.number === 1) {
-      const groups = config.kinds
-        .slice(0, 2)
-        .map((kind) => deck.filter((entry) => entry.kind === kind).slice(0, 3))
-      const tutorialEntries = groups.flat()
-      tutorialEntries.forEach((entry, index) => {
-        const currentIndex = deck.indexOf(entry)
-        const targetIndex = deck.length - tutorialEntries.length + index
-        ;[deck[currentIndex], deck[targetIndex]] = [deck[targetIndex], deck[currentIndex]]
-      })
-      this.tutorialGroups = groups.map((group) => group.map((entry) => entry.id))
-      this.tutorialGroupIndex = 0
-    }
     return deck
   }
 
@@ -279,7 +260,7 @@ export class ToyboxGame {
     deck.forEach((entry, index) => {
       const object = this.factory.createToy(entry.kind)
       const targetScale = 0.92
-      object.position.copy(this.pilePosition(index, deck.length, random, true))
+      object.position.copy(this.pilePosition(index, deck.length, random))
       object.rotation.set(
         (random() - 0.5) * 1.2,
         random() * Math.PI * 2,
@@ -301,32 +282,25 @@ export class ToyboxGame {
       this.pileRoot.add(object)
       this.physics.addItem(entry.id, entry.kind, object, object.position, object.quaternion)
     })
-    this.activateTutorialGroup()
   }
 
   private pilePosition(
     index: number,
     total: number,
     random: () => number,
-    exposeTriple: boolean,
   ): THREE.Vector3 {
+    if (this.currentLevel === 1 && total === 3) {
+      return new THREE.Vector3(
+        (index - 1) * 1.65,
+        0.72,
+        0.25 + (random() - 0.5) * 0.16,
+      )
+    }
     const perLayer = 12
     const layer = Math.floor(index / perLayer)
     const slot = index % perLayer
     const column = slot % 4
     const row = Math.floor(slot / 4)
-    const layerCount = Math.ceil(total / perLayer)
-    const tutorialTopCount = this.currentLevel === 1 ? 6 : 0
-    if (exposeTriple && tutorialTopCount > 0 && index >= total - tutorialTopCount) {
-      const tutorialIndex = index - (total - tutorialTopCount)
-      const groupIndex = Math.floor(tutorialIndex / 3)
-      const indexInGroup = tutorialIndex % 3
-      return new THREE.Vector3(
-        (indexInGroup - 1) * 1.38,
-        0.8 + layerCount * 1.28 + (groupIndex === 0 ? 0.62 : 0),
-        (groupIndex === 0 ? 0.62 : -0.55) + (random() - 0.5) * 0.16,
-      )
-    }
     return new THREE.Vector3(
       (column - 1.5) * 1.34 + (random() - 0.5) * 0.22,
       0.58 + layer * 1.28 + random() * 0.08,
@@ -336,21 +310,19 @@ export class ToyboxGame {
 
   private selectItem(item: PileItem): void {
     if (!this.canInteract() || !this.state || item.selected || item.removed) return
-    const tutorialGroup = this.currentTutorialGroup()
-    if (tutorialGroup && !tutorialGroup.includes(item.id)) {
-      this.showTutorialProgress()
-      return
-    }
     const result = this.state.select(item.id)
     if (!result) return
 
+    if (this.currentLevel === 1) {
+      this.firstLevelSelectionMade = true
+      this.cancelFirstLevelHint()
+      this.ui.hideToast()
+    }
     this.inputLocked = true
     item.selected = true
     this.clearHover()
-    this.setTutorialHighlight(item.object, false)
     this.audio.pick()
     this.ui.updateStats(this.bankedScore + result.score, result.remaining)
-    this.showTutorialProgress()
     const trayIndex = Math.max(0, result.preResolutionTray.findIndex((entry) => entry.id === item.id))
     const slot = this.ui.getTraySlotCenter(trayIndex)
     const targetPosition = this.screenPointToWorld(slot.x, slot.y, 8.2)
@@ -388,9 +360,6 @@ export class ToyboxGame {
 
   private resolveMatch(result: SelectionResult): void {
     const kind = result.matched[0].kind
-    const matchedIds = new Set(result.matched.map((entry) => entry.id))
-    const tutorialGroupCompleted =
-      this.currentTutorialGroup()?.every((id) => matchedIds.has(id)) ?? false
     this.ui.flashMatch(kind)
     this.audio.match(result.combo)
     for (const entry of result.matched) {
@@ -402,7 +371,6 @@ export class ToyboxGame {
       update: () => undefined,
       complete: () => {
         this.ui.renderTray(result.tray)
-        if (tutorialGroupCompleted) this.advanceTutorialGroup()
         this.completeSelection(result)
       },
     })
@@ -422,6 +390,8 @@ export class ToyboxGame {
 
   private finishLevel(won: boolean): void {
     if (!this.state) return
+    this.cancelFirstLevelHint()
+    this.ui.hideToast()
     this.playing = false
     this.inputLocked = true
     this.completedLevelScore = this.state.score
@@ -534,144 +504,15 @@ export class ToyboxGame {
   }
 
   private setGlow(object: THREE.Object3D, enabled: boolean): void {
-    const tutorialHighlighted = Boolean(object.userData.tutorialHighlighted)
     object.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
       const materials = Array.isArray(child.material) ? child.material : [child.material]
       for (const material of materials) {
         if (!(material instanceof THREE.MeshStandardMaterial)) continue
-        if (tutorialHighlighted) {
-          material.emissive.set(enabled ? '#fff7ad' : '#ffd43b')
-          material.emissiveIntensity = enabled ? 1.45 : 0.98
-        } else {
-          material.emissive.set(enabled ? '#8877ff' : '#000000')
-          material.emissiveIntensity = enabled ? 0.18 : 0
-        }
+        material.emissive.set(enabled ? '#8877ff' : '#000000')
+        material.emissiveIntensity = enabled ? 0.18 : 0
       }
     })
-  }
-
-  private activateTutorialGroup(): void {
-    const group = this.currentTutorialGroup()
-    if (!group) return
-    const random = mulberry32(
-      (this.levelSeed ^ ((this.tutorialGroupIndex + 1) * 0x45d9f3b)) >>> 0,
-    )
-    group.forEach((id, index) => {
-      const item = this.items.get(id)
-      if (!item || item.selected || item.removed) return
-      const position = new THREE.Vector3(
-        (index - 1) * 1.38,
-        4.3 + index * 0.1,
-        0.45 + (random() - 0.5) * 0.2,
-      )
-      const rotation = new THREE.Quaternion().setFromEuler(
-        new THREE.Euler(
-          (random() - 0.5) * 0.8,
-          random() * Math.PI * 2,
-          (random() - 0.5) * 0.8,
-        ),
-      )
-      this.physics.placeItem(id, position, rotation)
-      this.setTutorialHighlight(item.object, true)
-    })
-    this.showTutorialProgress()
-  }
-
-  private advanceTutorialGroup(): void {
-    this.tutorialGroupIndex += 1
-    if (this.tutorialGroupIndex >= this.tutorialGroups.length) {
-      this.tutorialGroupIndex = -1
-      this.ui.showTutorialComplete()
-      return
-    }
-    this.activateTutorialGroup()
-  }
-
-  private currentTutorialGroup(): string[] | null {
-    if (this.tutorialGroupIndex < 0) return null
-    return this.tutorialGroups[this.tutorialGroupIndex] ?? null
-  }
-
-  private showTutorialProgress(): void {
-    const group = this.currentTutorialGroup()
-    if (!group || this.tutorialGroupIndex > 1) return
-    const collected = group.filter((id) => this.items.get(id)?.selected).length
-    this.ui.showTutorialStep((this.tutorialGroupIndex + 1) as 1 | 2, collected)
-  }
-
-  private setTutorialHighlight(object: THREE.Object3D, enabled: boolean): void {
-    if (Boolean(object.userData.tutorialHighlighted) === enabled) return
-    object.userData.tutorialHighlighted = enabled
-
-    const outlineMeshes: THREE.Mesh[] = []
-    const sourceMeshes: THREE.Mesh[] = []
-    object.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return
-      if (child.userData.tutorialOutline) outlineMeshes.push(child)
-      else sourceMeshes.push(child)
-    })
-
-    for (const outline of outlineMeshes) outline.removeFromParent()
-
-    for (const mesh of sourceMeshes) {
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-      for (const material of materials) {
-        if (!(material instanceof THREE.MeshStandardMaterial)) continue
-        if (enabled) {
-          material.userData.tutorialMaterialState = {
-            emissive: material.emissive.getHex(),
-            emissiveIntensity: material.emissiveIntensity,
-            roughness: material.roughness,
-          }
-          material.emissive.set('#ffd43b')
-          material.emissiveIntensity = 0.98
-          material.roughness = Math.min(material.roughness, 0.34)
-        } else {
-          const state = material.userData.tutorialMaterialState as
-            | { emissive: number; emissiveIntensity: number; roughness: number }
-            | undefined
-          if (state) {
-            material.emissive.setHex(state.emissive)
-            material.emissiveIntensity = state.emissiveIntensity
-            material.roughness = state.roughness
-            delete material.userData.tutorialMaterialState
-          }
-        }
-      }
-
-      if (enabled) {
-        const outline = new THREE.Mesh(mesh.geometry, this.tutorialOutlineMaterial)
-        outline.userData.tutorialOutline = true
-        outline.scale.setScalar(1.075)
-        outline.castShadow = false
-        outline.receiveShadow = false
-        outline.raycast = () => undefined
-        mesh.add(outline)
-      }
-    }
-  }
-
-  private updateTutorialPulse(): void {
-    const group = this.currentTutorialGroup()
-    if (!group) return
-    const pulse = 0.94 + Math.sin(this.elapsed * 5.2) * 0.2
-    const outlineScale = 1.075 + Math.sin(this.elapsed * 5.2) * 0.008
-    for (const id of group) {
-      const item = this.items.get(id)
-      if (!item || item.selected || item.removed) continue
-      item.object.traverse((child) => {
-        if (!(child instanceof THREE.Mesh)) return
-        if (child.userData.tutorialOutline) {
-          child.scale.setScalar(outlineScale)
-          return
-        }
-        const materials = Array.isArray(child.material) ? child.material : [child.material]
-        for (const material of materials) {
-          if (material instanceof THREE.MeshStandardMaterial) material.emissiveIntensity = pulse
-        }
-      })
-    }
   }
 
   private pick(clientX: number, clientY: number): PileItem | null {
@@ -705,7 +546,39 @@ export class ToyboxGame {
     return this.playing && !this.paused && !this.inputLocked
   }
 
+  private scheduleFirstLevelHint(): void {
+    this.cancelFirstLevelHint()
+    if (
+      this.currentLevel !== 1 ||
+      !this.playing ||
+      this.paused ||
+      this.firstLevelSelectionMade ||
+      this.state?.remaining !== 3
+    ) {
+      return
+    }
+    this.firstLevelHintTimer = window.setTimeout(() => {
+      this.firstLevelHintTimer = 0
+      if (
+        this.currentLevel === 1 &&
+        this.playing &&
+        !this.paused &&
+        !this.firstLevelSelectionMade &&
+        this.state?.remaining === 3
+      ) {
+        this.ui.showFirstLevelHint()
+      }
+    }, FIRST_LEVEL_HINT_DELAY_MS)
+  }
+
+  private cancelFirstLevelHint(): void {
+    window.clearTimeout(this.firstLevelHintTimer)
+    this.firstLevelHintTimer = 0
+  }
+
   private clearLevel(): void {
+    this.cancelFirstLevelHint()
+    this.ui.hideToast()
     this.tweens.clear()
     this.clearHover()
     for (const item of this.items.values()) item.object.removeFromParent()
@@ -803,7 +676,6 @@ export class ToyboxGame {
       this.elapsed += delta
       this.physics.step(delta)
       this.tweens.update(delta)
-      this.updateTutorialPulse()
       if (this.rescuedPet) {
         this.rescuedPet.position.y = 0.78 + Math.sin(this.elapsed * 3.2) * 0.08
         this.rescuedPet.rotation.y += delta * 0.45
