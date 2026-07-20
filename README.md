@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-浏览器打开终端显示的本地地址（开发服务器会使用 `/Toybox-Trio/` 路径）。
+浏览器打开终端显示的本地地址。
 
 ## 构建
 
@@ -21,6 +21,8 @@ npm run preview
 ```
 
 生产文件输出到 `dist/`。
+
+构建产物使用相对资源路径，同一份 `dist/` 可部署到 GitHub Pages 的项目子目录，也可直接打包上传 Poki。
 
 ## 资产
 
