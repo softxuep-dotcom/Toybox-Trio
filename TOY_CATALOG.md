@@ -25,9 +25,9 @@
 | 19 | 玩具香蕉 | `banana` | GLB | Kenney Food Kit，CC0 | Box 4 |
 | 20 | 玩具菠萝 | `pineapple` | GLB | Kenney Food Kit，CC0 | Box 4 |
 
-## 奖励宠物
+## 修复项目
 
-通关后救出的 Mochi 猫、Pip 兔和 Bao 熊猫使用 Kenney Cube Pets CC0 GLB；它们是关卡奖励，不参与三消。
+每个玩具箱都有一个持续可见的主角玩具：Zip 赛车、Chug 火车、Nova 火箭、Pixel 街机和 Bolt 机器人。每次三消都会为它补充修复进度；清空玩具堆后，修好的主角玩具会移到箱子中央并启动。修复项目复用当前玩具模型，不参与本关的收纳槽规则。
 
 ## 托盘图标
 
@@ -43,7 +43,7 @@
 
 ## 包体与许可证
 
-运行时共有 16 个精选 GLB（含 3 个奖励宠物），`public/models/` 全部文件约 1.01 MB。模型均随构建发布，不依赖第三方 CDN；许可证副本位于 `public/licenses/`。
+运行时加载 13 个精选玩具 GLB，`public/models/` 全部文件约 1.01 MB。仓库保留的 3 个 Cube Pets 历史素材不再由游戏加载。模型均随构建发布，不依赖第三方 CDN；许可证副本位于 `public/licenses/`。
 
 官方资产页：
 

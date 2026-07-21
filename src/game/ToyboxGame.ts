@@ -6,7 +6,7 @@ import { ToyFactory } from './render/ToyFactory'
 import { easing, TweenSystem } from './render/TweenSystem'
 import { GameState } from './simulation/GameState'
 import type { LevelConfig, SelectionResult, ToyKind, TrayEntry } from './types'
-import { getLevelConfig } from './types'
+import { getLevelConfig, TOY_DEFINITIONS } from './types'
 import type { GameUI } from './ui/GameUI'
 
 interface PileItem {
@@ -57,7 +57,13 @@ export class ToyboxGame {
   private transitionPending = false
   private gesture: PointerGesture | null = null
   private hoveredItem: PileItem | null = null
-  private rescuedPet: THREE.Group | null = null
+  private repairProject: THREE.Group | null = null
+  private repairProjectToy: THREE.Group | null = null
+  private readonly repairSparks = new Set<THREE.Mesh>()
+  private repairMatches = 0
+  private repairSteps = 1
+  private repairProjectActivated = false
+  private repairProjectIdleY = 0
   private runSeed = createRandomSeed()
   private levelSeed = 0
   private firstLevelHintTimer = 0
@@ -223,11 +229,14 @@ export class ToyboxGame {
     this.elapsed = 0
     this.levelSeed = mixSeed(this.runSeed, this.currentLevel)
     const deck = this.createDeck(this.config)
+    this.repairMatches = 0
+    this.repairSteps = Math.max(1, Math.floor(deck.length / 3))
     this.state = new GameState(deck)
     this.ui.setLevel(this.config, deck.length)
     this.ui.renderTray([])
     this.ui.updateStats(this.bankedScore, deck.length)
     this.createPile(deck)
+    this.createRepairProject()
     this.playing = true
     this.paused = false
     this.inputLocked = true
@@ -369,6 +378,9 @@ export class ToyboxGame {
     const kind = result.matched[0].kind
     this.ui.flashMatch(kind)
     this.audio.match(result.combo)
+    this.repairMatches = Math.min(this.repairSteps, this.repairMatches + 1)
+    this.ui.setRepairProgress(this.repairMatches, this.repairSteps)
+    this.chargeRepairProject(kind)
     for (const entry of result.matched) {
       const matchedItem = this.items.get(entry.id)
       if (matchedItem) matchedItem.removed = true
@@ -409,12 +421,12 @@ export class ToyboxGame {
 
     if (won) {
       this.audio.win()
-      this.revealPet()
+      this.activateRepairProject()
       this.tweens.add({
-        duration: 0.72,
+        duration: 1.72,
         update: () => undefined,
         complete: () =>
-          this.ui.showResult(true, this.currentLevel, totalScore, this.config.petName),
+          this.ui.showResult(true, this.currentLevel, totalScore, this.config.repairName),
       })
     } else {
       this.audio.lose()
@@ -426,7 +438,7 @@ export class ToyboxGame {
             false,
             this.currentLevel,
             totalScore,
-            this.config.petName,
+            this.config.repairName,
             !this.rewardedContinueUsed && this.state!.tray.length >= 2,
           ),
       })
@@ -460,17 +472,115 @@ export class ToyboxGame {
     )
   }
 
-  private revealPet(): void {
-    const pet = this.factory.createPet(this.config.petModel)
-    pet.position.set(0, 0.75, 0)
-    pet.rotation.y = -0.25
-    pet.scale.setScalar(0.001)
-    this.scene.add(pet)
-    this.rescuedPet = pet
+  private createRepairProject(): void {
+    const project = new THREE.Group()
+    const platform = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.05, 1.18, 0.18, 28),
+      new THREE.MeshStandardMaterial({
+        color: '#e7e0ff',
+        emissive: '#6f5bd3',
+        emissiveIntensity: 0.08,
+        roughness: 0.55,
+      }),
+    )
+    platform.position.y = 0.02
+    platform.castShadow = true
+    platform.receiveShadow = true
+
+    const toy = this.factory.createToy(this.config.repairModel)
+    toy.position.y = 0.9
+    toy.scale.setScalar(1.38)
+    project.add(platform, toy)
+    project.position.set(0, 1.3, -3.62)
+    project.rotation.y = -0.22
+    this.scene.add(project)
+    this.repairProject = project
+    this.repairProjectToy = toy
+    this.repairProjectActivated = false
+    this.repairProjectIdleY = project.position.y
+    this.updateRepairProjectAppearance(0)
+  }
+
+  private chargeRepairProject(kind: ToyKind): void {
+    if (!this.repairProject || !this.repairProjectToy) return
+    const progress = this.repairMatches / this.repairSteps
+    this.updateRepairProjectAppearance(progress)
+
+    const color = TOY_DEFINITIONS[kind].color
+    const material = new THREE.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: 1.4,
+      transparent: true,
+      opacity: 0.95,
+    })
+    const spark = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), material)
+    const start = new THREE.Vector3(0, 1.55, 1.25)
+    const target = this.repairProject.getWorldPosition(new THREE.Vector3()).add(
+      new THREE.Vector3(0, 1.02, 0),
+    )
+    spark.position.copy(start)
+    this.scene.add(spark)
+    this.repairSparks.add(spark)
+
     this.tweens.add({
-      duration: 0.62,
+      duration: 0.52,
+      ease: easing.outCubic,
+      update: (sparkProgress) => {
+        const arc = Math.sin(sparkProgress * Math.PI) * 1.15
+        spark.position.lerpVectors(start, target, sparkProgress)
+        spark.position.y += arc
+        spark.scale.setScalar(0.7 + Math.sin(sparkProgress * Math.PI) * 1.4)
+        material.opacity = 0.95 - sparkProgress * 0.25
+      },
+      complete: () => {
+        spark.removeFromParent()
+        spark.geometry.dispose()
+        material.dispose()
+        this.repairSparks.delete(spark)
+      },
+    })
+  }
+
+  private updateRepairProjectAppearance(progress: number): void {
+    if (!this.repairProjectToy) return
+    const safeProgress = THREE.MathUtils.clamp(progress, 0, 1)
+    const accent = new THREE.Color(TOY_DEFINITIONS[this.config.repairModel].color)
+    this.repairProjectToy.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const material of materials) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue
+        material.transparent = safeProgress < 0.999
+        material.opacity = 0.34 + safeProgress * 0.66
+        material.emissive.copy(accent)
+        material.emissiveIntensity = 0.05 + safeProgress * 0.28
+      }
+    })
+  }
+
+  private activateRepairProject(): void {
+    if (!this.repairProject) return
+    this.updateRepairProjectAppearance(1)
+    const project = this.repairProject
+    const startPosition = project.position.clone()
+    const targetPosition = new THREE.Vector3(0, 0.12, 0)
+    const startScale = project.scale.clone()
+    const targetScale = new THREE.Vector3(1.32, 1.32, 1.32)
+    const startRotation = project.rotation.y
+    this.repairProjectActivated = false
+    this.tweens.add({
+      duration: 0.86,
       ease: easing.outBack,
-      update: (progress) => pet.scale.setScalar(Math.max(0.001, progress)),
+      update: (progress) => {
+        project.position.lerpVectors(startPosition, targetPosition, progress)
+        project.scale.lerpVectors(startScale, targetScale, progress)
+        project.rotation.y = startRotation + progress * Math.PI * 2
+      },
+      complete: () => {
+        this.repairProjectIdleY = project.position.y
+        this.repairProjectActivated = true
+      },
     })
   }
 
@@ -682,8 +792,19 @@ export class ToyboxGame {
     for (const item of this.items.values()) item.object.removeFromParent()
     this.physics.clearItems()
     this.items.clear()
-    this.rescuedPet?.removeFromParent()
-    this.rescuedPet = null
+    for (const spark of this.repairSparks) {
+      spark.removeFromParent()
+      spark.geometry.dispose()
+      const materials = Array.isArray(spark.material) ? spark.material : [spark.material]
+      for (const material of materials) material.dispose()
+    }
+    this.repairSparks.clear()
+    this.repairProject?.removeFromParent()
+    this.repairProject = null
+    this.repairProjectToy = null
+    this.repairProjectActivated = false
+    this.repairMatches = 0
+    this.repairSteps = 1
     this.cameraYaw = 0
     this.updateCamera()
     this.state = null
@@ -774,9 +895,10 @@ export class ToyboxGame {
       this.elapsed += delta
       this.physics.step(delta)
       this.tweens.update(delta)
-      if (this.rescuedPet) {
-        this.rescuedPet.position.y = 0.78 + Math.sin(this.elapsed * 3.2) * 0.08
-        this.rescuedPet.rotation.y += delta * 0.45
+      if (this.repairProject && this.repairProjectActivated) {
+        this.repairProject.position.y =
+          this.repairProjectIdleY + Math.sin(this.elapsed * 3.5) * 0.09
+        this.repairProject.rotation.y += delta * 0.48
       }
     }
     this.renderer.render(this.scene, this.camera)

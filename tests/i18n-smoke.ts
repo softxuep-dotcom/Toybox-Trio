@@ -31,5 +31,8 @@ assert.equal(resolveLocale(['pt-PT']), 'en')
 assert.equal(resolveLocale(['nl-NL']), 'en')
 assert.equal(resolveLocale(['nl-NL', 'de-DE']), 'de')
 assert.equal(resolveLocale([]), 'en')
+assert.equal(GAME_COPY.en.repaired, 'Toy repaired!')
+assert.equal(GAME_COPY['zh-CN'].repaired, '修复完成！')
+assert.equal(GAME_COPY['zh-CN'].repair, '修复')
 
 console.log('Localization smoke tests passed')

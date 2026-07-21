@@ -18,6 +18,8 @@ for (const kind of TOY_KINDS) {
 const tutorialLevel = getLevelConfig(1)
 assert.deepEqual(tutorialLevel.kinds, ['car'], 'Box 1 should contain only cars')
 assert.equal(tutorialLevel.copiesPerKind, 3, 'Box 1 should contain exactly three cars')
+assert.equal(tutorialLevel.repairModel, 'car', 'Box 1 should repair the wind-up racer')
+assert.equal(tutorialLevel.repairName, 'Zip', 'Box 1 repair project should have a stable name')
 assert.equal(tutorialLevel.rattles, 0, 'Box 1 should not expose the rattle tool')
 assert.equal(tutorialLevel.undos, 0, 'Box 1 should not need undo')
 
@@ -25,6 +27,8 @@ const openingLevels = [1, 2, 3, 4].map((level) => getLevelConfig(level))
 for (const config of openingLevels) {
   assert.equal(new Set(config.kinds).size, config.kinds.length, `Box ${config.number} has duplicates`)
   assert.equal(config.copiesPerKind % 3, 0, `Box ${config.number} must remain divisible by three`)
+  assert.ok(TOY_KINDS.includes(config.repairModel), `Box ${config.number} needs a valid repair model`)
+  assert.ok(config.repairName.length > 0, `Box ${config.number} needs a named repair project`)
 }
 
 const introducedKinds = new Set(openingLevels.flatMap((config) => config.kinds))

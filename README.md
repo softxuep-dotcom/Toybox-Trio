@@ -1,6 +1,6 @@
 # Toybox Trio
 
-原创 Three.js + Rapier 3D 三同物收集游戏。旋转视角观察真实物理玩具堆，把三个相同玩具放入收纳槽，并救出箱底的方块宠物。
+原创 Three.js + Rapier 3D 三同物收集游戏。旋转视角观察真实物理玩具堆，把三个相同玩具放入收纳槽，为本箱的主角玩具补充零件并完成修复。
 
 第一箱是仅含 3 辆玩具车的短教学；玩家长时间未选择时才显示“点击车模型”提示。玩具先以 3D 模型飞入收纳槽，再切换为渲染图标并在三消时聚拢爆开；第二箱起进入随机牌库、朝向和物理堆叠的正式关卡。
 
@@ -34,7 +34,7 @@ npm run preview
 
 ## 资产
 
-精选 GLB 来自 Kenney Cube Pets、Toy Car Kit、Brick Kit、Space Kit、Mini Arcade、Train Kit 和 Food Kit，均为 CC0。许可证副本位于 `public/licenses/`。其余模型和全部音效由代码生成。
+玩法使用的精选 GLB 来自 Kenney Toy Car Kit、Brick Kit、Space Kit、Mini Arcade、Train Kit 和 Food Kit，均为 CC0。许可证副本位于 `public/licenses/`。其余模型和全部音效由代码生成；仓库中保留的 Cube Pets 历史素材不再由游戏加载。
 
 完整设计见 [DESIGN.md](./DESIGN.md)。
 

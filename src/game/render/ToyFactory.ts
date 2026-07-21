@@ -1,15 +1,31 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js'
-import type { LevelConfig, ToyKind } from '../types'
+import type { ToyKind } from '../types'
 import { TOY_DEFINITIONS, TOY_KINDS } from '../types'
 
-type PetModel = LevelConfig['petModel']
+type PetModel = 'cat' | 'bunny' | 'panda'
 
 interface ModelRequest {
   key: ToyKind | PetModel
   path: string
   type: 'toy' | 'pet'
+}
+
+interface ToyModelPalette {
+  primary: THREE.ColorRepresentation
+  secondary?: THREE.ColorRepresentation
+  tintTexture?: boolean
+}
+
+const TOY_MODEL_PALETTES: Partial<Record<ToyKind, ToyModelPalette>> = {
+  car: { primary: '#74aaff', tintTexture: true },
+  brick: { primary: '#ff9f43', tintTexture: true },
+  spaceship: { primary: '#ff9f1c', secondary: '#7b61ff' },
+  rover: { primary: '#6685e8', secondary: '#3f4f9e' },
+  alien: { primary: '#51d9c5', secondary: '#4968c8' },
+  arcade: { primary: '#8993ff', tintTexture: true },
+  claw: { primary: '#ff8db3', tintTexture: true },
 }
 
 export class ToyFactory {
@@ -20,10 +36,6 @@ export class ToyFactory {
   async load(onProgress: (progress: number) => void): Promise<void> {
     for (const kind of TOY_KINDS) {
       this.toyPrototypes.set(kind, this.createProceduralToy(kind))
-    }
-
-    for (const pet of ['cat', 'bunny', 'panda'] as const) {
-      this.petPrototypes.set(pet, this.createFallbackPet(pet))
     }
 
     const baseUrl = import.meta.env.BASE_URL
@@ -65,9 +77,6 @@ export class ToyFactory {
         path: `${baseUrl}models/food-kit/toy-pineapple.glb`,
         type: 'toy',
       },
-      { key: 'cat', path: `${baseUrl}models/cube-pets/pet-cat.glb`, type: 'pet' },
-      { key: 'bunny', path: `${baseUrl}models/cube-pets/pet-bunny.glb`, type: 'pet' },
-      { key: 'panda', path: `${baseUrl}models/cube-pets/pet-panda.glb`, type: 'pet' },
     ]
 
     let loadedCount = 0
@@ -77,7 +86,9 @@ export class ToyFactory {
           const gltf = await this.loader.loadAsync(request.path)
           const fitted = this.fitModel(gltf.scene, request.type === 'pet' ? 1.9 : 1.25)
           if (request.type === 'toy') {
-            this.toyPrototypes.set(request.key as ToyKind, fitted)
+            const kind = request.key as ToyKind
+            this.applyToyModelPalette(fitted, kind)
+            this.toyPrototypes.set(kind, fitted)
           } else {
             this.petPrototypes.set(request.key as PetModel, fitted)
           }
@@ -201,10 +212,35 @@ export class ToyFactory {
     return group
   }
 
+  private applyToyModelPalette(group: THREE.Group, kind: ToyKind): void {
+    const palette = TOY_MODEL_PALETTES[kind]
+    if (!palette) return
+
+    group.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const material of materials) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue
+
+        if (palette.tintTexture && material.map) {
+          material.color.set(palette.primary)
+          continue
+        }
+
+        const materialName = material.name.toLowerCase()
+        if (materialName === 'metal') {
+          material.color.set(palette.primary)
+        } else if (materialName === 'metaldark' && palette.secondary) {
+          material.color.set(palette.secondary)
+        }
+      }
+    })
+  }
+
   private createBall(): THREE.Group {
     const group = new THREE.Group()
     const ball = this.mesh(new THREE.SphereGeometry(0.52, 20, 14), '#ff6b6b')
-    const ring = this.mesh(new THREE.TorusGeometry(0.525, 0.035, 8, 28), '#fff2d8')
+    const ring = this.mesh(new THREE.TorusGeometry(0.525, 0.035, 8, 28), '#ffd166')
     ring.rotation.x = Math.PI / 2
     group.add(ball, ring)
     return group
@@ -212,7 +248,7 @@ export class ToyFactory {
 
   private createRocket(): THREE.Group {
     const group = new THREE.Group()
-    const body = this.mesh(new THREE.CylinderGeometry(0.27, 0.31, 0.78, 16), '#f7f4ff')
+    const body = this.mesh(new THREE.CylinderGeometry(0.27, 0.31, 0.78, 16), '#45c6c0')
     const nose = this.mesh(new THREE.ConeGeometry(0.31, 0.42, 16), '#7b61ff')
     nose.position.y = 0.6
     const windowMesh = this.mesh(new THREE.SphereGeometry(0.13, 12, 8), '#4d96ff', 0.25)
@@ -234,7 +270,7 @@ export class ToyFactory {
     const group = new THREE.Group()
     const cone = this.mesh(new THREE.ConeGeometry(0.55, 0.72, 18), '#26c6a2')
     cone.rotation.z = Math.PI
-    const rim = this.mesh(new THREE.TorusGeometry(0.43, 0.09, 8, 24), '#fff2d8')
+    const rim = this.mesh(new THREE.TorusGeometry(0.43, 0.09, 8, 24), '#ffcb5c')
     rim.rotation.x = Math.PI / 2
     rim.position.y = 0.08
     const handle = this.mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.42, 12), '#7b61ff')
@@ -260,9 +296,9 @@ export class ToyFactory {
 
   private createRobot(): THREE.Group {
     const group = new THREE.Group()
-    const body = this.mesh(new THREE.BoxGeometry(0.72, 0.66, 0.46), '#73849a')
+    const body = this.mesh(new THREE.BoxGeometry(0.72, 0.66, 0.46), '#5f6fe0')
     body.position.y = -0.1
-    const head = this.mesh(new THREE.BoxGeometry(0.62, 0.48, 0.5), '#a9b7c6')
+    const head = this.mesh(new THREE.BoxGeometry(0.62, 0.48, 0.5), '#56c9c2')
     head.position.y = 0.5
     for (const x of [-0.16, 0.16]) {
       const eye = this.mesh(new THREE.SphereGeometry(0.065, 10, 8), '#4d96ff', 0.2)
@@ -275,7 +311,7 @@ export class ToyFactory {
     tip.position.y = 1.02
     group.add(body, head, antenna, tip)
     for (const side of [-1, 1]) {
-      const arm = this.mesh(new THREE.CapsuleGeometry(0.08, 0.34, 4, 8), '#a9b7c6')
+      const arm = this.mesh(new THREE.CapsuleGeometry(0.08, 0.34, 4, 8), '#56c9c2')
       arm.position.set(side * 0.48, -0.05, 0)
       arm.rotation.z = side * 0.18
       group.add(arm)

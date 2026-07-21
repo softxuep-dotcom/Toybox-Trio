@@ -35,7 +35,7 @@ export class GameUI {
   private readonly scoreLabel: HTMLElement
   private readonly remainingLabel: HTMLElement
   private readonly progressBar: HTMLElement
-  private readonly petGoal: HTMLElement
+  private readonly repairGoal: HTMLElement
   private readonly toast: HTMLElement
   private readonly traySlotsRoot: HTMLElement
   private readonly traySlots: HTMLElement[]
@@ -48,7 +48,7 @@ export class GameUI {
   private overlayAction: 'start' | 'restart' | 'next' | 'resume' = 'start'
   private secondaryAction: 'restart' | 'rewardedContinue' | null = null
   private toastTimer = 0
-  private totalItems = 1
+  private totalRepairSteps = 1
 
   constructor(root: HTMLElement) {
     this.root = root
@@ -70,7 +70,7 @@ export class GameUI {
           <button class="round-button" id="pause-button" type="button" aria-label="${copy.pauseLabel}">Ⅱ</button>
         </header>
 
-        <section class="goal-chip" id="pet-goal" aria-live="polite"></section>
+        <section class="goal-chip" id="repair-goal" aria-live="polite"></section>
         <div class="progress-track" aria-hidden="true"><div id="progress-bar"></div></div>
 
         <aside class="tool-rail" aria-label="${copy.toolsLabel}">
@@ -123,7 +123,7 @@ export class GameUI {
     this.scoreLabel = this.required('#score-label')
     this.remainingLabel = this.required('#remaining-label')
     this.progressBar = this.required('#progress-bar')
-    this.petGoal = this.required('#pet-goal')
+    this.repairGoal = this.required('#repair-goal')
     this.toast = this.required('#hint-toast')
     this.traySlotsRoot = this.required('#tray-slots')
     this.traySlots = Array.from(root.querySelectorAll<HTMLElement>('.tray-slot'))
@@ -182,7 +182,7 @@ export class GameUI {
     won: boolean,
     level: number,
     score: number,
-    petName: string,
+    repairName: string,
     canUseRewardedContinue = false,
   ): void {
     this.overlayAction = won ? 'next' : 'restart'
@@ -192,9 +192,9 @@ export class GameUI {
         ? 'rewardedContinue'
         : null
     this.overlayEyebrow.textContent = won
-      ? `${copy.safe}: ${petName.toUpperCase()}`
+      ? `${copy.restored}: ${repairName.toUpperCase()}`
       : copy.oneMoreTry
-    this.overlayTitle.textContent = won ? copy.rescued : copy.full
+    this.overlayTitle.textContent = won ? copy.repaired : copy.full
     this.overlayCopy.textContent = won
       ? `${copy.level} ${level} · ${copy.score} ${score.toLocaleString(locale)}`
       : `${copy.score} ${score.toLocaleString(locale)} · ${copy.remaining} ${this.remainingLabel.textContent}`
@@ -207,19 +207,40 @@ export class GameUI {
   }
 
   setLevel(config: LevelConfig, totalItems: number): void {
-    this.totalItems = totalItems
+    this.totalRepairSteps = Math.max(1, Math.floor(totalItems / 3))
     this.levelLabel.textContent = `${copy.level} ${config.number}`
-    const petIcon = config.petModel === 'cat' ? '🐱' : config.petModel === 'bunny' ? '🐰' : '🐼'
-    this.petGoal.innerHTML = `<span>${petIcon}</span><p><small>${copy.rescue}</small><strong>${config.petName}</strong></p>`
+    this.repairGoal.innerHTML = `<span aria-hidden="true"><img src="${toyIconUrl(config.repairModel)}" alt="" draggable="false"></span><p><small>${copy.repair}</small><strong>${config.repairName}</strong></p><em>0/${this.totalRepairSteps}</em>`
+    this.repairGoal.setAttribute(
+      'aria-label',
+      `${copy.repair} ${config.repairName}, 0/${this.totalRepairSteps}`,
+    )
     this.setToolCounts(config.rattles, config.undos)
+    this.setRepairProgress(0, this.totalRepairSteps)
     this.updateStats(0, totalItems)
   }
 
   updateStats(score: number, remaining: number): void {
     this.scoreLabel.textContent = score.toLocaleString(locale)
     this.remainingLabel.textContent = String(remaining)
-    const progress = Math.max(0, Math.min(1, 1 - remaining / this.totalItems))
+  }
+
+  setRepairProgress(completed: number, total = this.totalRepairSteps): void {
+    this.totalRepairSteps = Math.max(1, total)
+    const safeCompleted = Math.max(0, Math.min(this.totalRepairSteps, completed))
+    const progress = safeCompleted / this.totalRepairSteps
     this.progressBar.style.width = `${progress * 100}%`
+    const count = this.repairGoal.querySelector('em')
+    if (count) count.textContent = `${safeCompleted}/${this.totalRepairSteps}`
+    const name = this.repairGoal.querySelector('strong')?.textContent ?? ''
+    this.repairGoal.setAttribute(
+      'aria-label',
+      `${copy.repair} ${name}, ${safeCompleted}/${this.totalRepairSteps}`,
+    )
+    if (safeCompleted > 0) {
+      this.repairGoal.classList.remove('charged')
+      void this.repairGoal.offsetWidth
+      this.repairGoal.classList.add('charged')
+    }
   }
 
   renderTray(entries: readonly TrayEntry[]): void {

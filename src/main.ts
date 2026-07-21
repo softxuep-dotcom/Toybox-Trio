@@ -32,7 +32,7 @@ void game
     if (!import.meta.env.DEV) return
     const search = new URLSearchParams(window.location.search)
     if (search.get('debugOverlay') === 'loss') {
-      ui.showResult(false, 2, 350, 'Pip', true)
+      ui.showResult(false, 2, 350, 'Chug', true)
       return
     }
     const debugBox = Number(search.get('debugBox'))

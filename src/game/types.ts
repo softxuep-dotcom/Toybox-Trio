@@ -36,11 +36,11 @@ export const TOY_DEFINITIONS: Record<ToyKind, ToyDefinition> = {
   rocket: { label: 'Pocket rocket', icon: '🚀', color: '#7b61ff' },
   top: { label: 'Spinning top', icon: '🌀', color: '#26c6a2' },
   gift: { label: 'Mystery gift', icon: '🎁', color: '#ff5ca8' },
-  robot: { label: 'Tiny robot', icon: '🤖', color: '#73849a' },
+  robot: { label: 'Tiny robot', icon: '🤖', color: '#5f6fe0' },
   drum: { label: 'Toy drum', icon: '🥁', color: '#f4c542' },
   star: { label: 'Glow star', icon: '⭐', color: '#ffd84d' },
   spaceship: { label: 'Space racer', icon: '🛸', color: '#ff9f1c' },
-  rover: { label: 'Moon rover', icon: '🛰️', color: '#9aa8b8' },
+  rover: { label: 'Moon rover', icon: '🛰️', color: '#6685e8' },
   alien: { label: 'Pocket alien', icon: '👽', color: '#51d9c5' },
   arcade: { label: 'Mini arcade', icon: '🕹️', color: '#6f7cff' },
   claw: { label: 'Claw machine', icon: '🧸', color: '#ff6f91' },
@@ -72,10 +72,15 @@ export interface LevelConfig {
   number: number
   kinds: ToyKind[]
   copiesPerKind: number
-  petModel: 'cat' | 'bunny' | 'panda'
-  petName: string
+  repairModel: ToyKind
+  repairName: string
   rattles: number
   undos: number
+}
+
+export interface RepairProject {
+  model: ToyKind
+  name: string
 }
 
 const TUTORIAL_LEVEL_KINDS: ToyKind[] = ['car']
@@ -102,12 +107,14 @@ const LEVEL_FOUR_KINDS: ToyKind[] = [
 ]
 
 export function getLevelConfig(level: number): LevelConfig {
-  const pets = [
-    { petModel: 'cat', petName: 'Mochi' },
-    { petModel: 'bunny', petName: 'Pip' },
-    { petModel: 'panda', petName: 'Bao' },
+  const repairProjects: readonly RepairProject[] = [
+    { model: 'car', name: 'Zip' },
+    { model: 'train', name: 'Chug' },
+    { model: 'rocket', name: 'Nova' },
+    { model: 'arcade', name: 'Pixel' },
+    { model: 'robot', name: 'Bolt' },
   ] as const
-  const pet = pets[(level - 1) % pets.length]
+  const repairProject = repairProjects[(level - 1) % repairProjects.length]
   const kinds =
     level === 1
       ? TUTORIAL_LEVEL_KINDS
@@ -123,8 +130,8 @@ export function getLevelConfig(level: number): LevelConfig {
     number: level,
     kinds: [...kinds],
     copiesPerKind: level === 1 ? 3 : 6,
-    petModel: pet.petModel,
-    petName: pet.petName,
+    repairModel: repairProject.model,
+    repairName: repairProject.name,
     rattles: level === 1 ? 0 : 1,
     undos: level === 1 ? 0 : 1,
   }

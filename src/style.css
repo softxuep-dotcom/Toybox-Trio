@@ -221,6 +221,13 @@ button:focus-visible {
   background: #f3efff;
 }
 
+.goal-chip > span img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 4px rgba(75, 56, 135, 0.2));
+}
+
 .goal-chip p {
   display: grid;
   gap: 1px;
@@ -237,6 +244,22 @@ button:focus-visible {
 
 .goal-chip strong {
   font-size: 0.87rem;
+}
+
+.goal-chip em {
+  min-width: 34px;
+  padding: 4px 6px;
+  color: #6653bb;
+  border-radius: 99px;
+  background: #eee9ff;
+  font-size: 0.62rem;
+  font-style: normal;
+  font-weight: 900;
+  text-align: center;
+}
+
+.goal-chip.charged {
+  animation: repair-charge 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.25);
 }
 
 .progress-track {
@@ -744,6 +767,17 @@ button:focus-visible {
   }
 }
 
+@keyframes repair-charge {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.08) rotate(-1deg);
+    box-shadow: 0 12px 28px rgba(117, 87, 220, 0.28);
+  }
+}
+
 @media (max-width: 760px) {
   .game-shell {
     min-height: 440px;
@@ -798,12 +832,23 @@ button:focus-visible {
     font-size: 1rem;
   }
 
+  .goal-chip > span img {
+    width: 28px;
+    height: 28px;
+  }
+
   .goal-chip small {
     font-size: 0.48rem;
   }
 
   .goal-chip strong {
     font-size: 0.74rem;
+  }
+
+  .goal-chip em {
+    min-width: 29px;
+    padding: 3px 5px;
+    font-size: 0.54rem;
   }
 
   .progress-track {
