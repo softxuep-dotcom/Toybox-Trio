@@ -150,9 +150,11 @@ export class ToyboxGame {
     if (this.paused) {
       this.cancelFirstLevelHint()
       this.poki.gameplayStop()
+      this.audio.suspend()
       this.ui.showPause()
       this.ui.setToolsEnabled(false)
     } else {
+      this.audio.resume()
       this.poki.gameplayStart()
       this.ui.hideOverlay()
       this.ui.setToolsEnabled(true)
@@ -349,6 +351,7 @@ export class ToyboxGame {
       complete: () => {
         item.object.visible = false
         this.ui.renderTray(result.preResolutionTray)
+        this.audio.place()
         if (result.matched.length > 0) {
           this.tweens.add({
             duration: 0.08,
