@@ -27,7 +27,12 @@ interface PointerGesture {
 }
 
 const pileCenter = new THREE.Vector3(0, 1.15, 0)
-const FIRST_LEVEL_HINT_DELAY_MS = 5_000
+const FIRST_LEVEL_HINT_DELAY_MS = 250
+const TUTORIAL_CAR_BASE_SCALE = 0.92
+const TUTORIAL_CAR_PULSE_AMOUNT = 0.045
+const TUTORIAL_CAR_PULSE_SPEED = 3.2
+const DEFAULT_CAMERA_YAW = THREE.MathUtils.degToRad(10)
+const REPAIR_PROJECT_DISTANCE = 4.3
 
 export class ToyboxGame {
   private readonly ui: GameUI
@@ -70,7 +75,7 @@ export class ToyboxGame {
   private firstLevelSelectionMade = false
   private rewardedContinueUsed = false
   private elapsed = 0
-  private cameraYaw = 0
+  private cameraYaw = DEFAULT_CAMERA_YAW
   private cameraHeight = 10.6
   private cameraDistance = 14.2
   private readonly cameraTarget = pileCenter.clone()
@@ -274,7 +279,7 @@ export class ToyboxGame {
     const random = mulberry32((this.levelSeed ^ 0x9e3779b9) >>> 0)
     deck.forEach((entry, index) => {
       const object = this.factory.createToy(entry.kind)
-      const targetScale = 0.92
+      const targetScale = TUTORIAL_CAR_BASE_SCALE
       object.position.copy(this.pilePosition(index, deck.length, random))
       object.rotation.set(
         (random() - 0.5) * 1.2,
@@ -491,8 +496,8 @@ export class ToyboxGame {
     toy.position.y = 0.9
     toy.scale.setScalar(1.38)
     project.add(platform, toy)
-    project.position.set(0, 1.3, -3.62)
-    project.rotation.y = -0.22
+    project.position.y = 1.3
+    this.positionRepairProject(project)
     this.scene.add(project)
     this.repairProject = project
     this.repairProjectToy = toy
@@ -805,7 +810,7 @@ export class ToyboxGame {
     this.repairProjectActivated = false
     this.repairMatches = 0
     this.repairSteps = 1
-    this.cameraYaw = 0
+    this.cameraYaw = DEFAULT_CAMERA_YAW
     this.updateCamera()
     this.state = null
   }
@@ -871,9 +876,9 @@ export class ToyboxGame {
     this.renderer.setSize(width, height, false)
     this.camera.aspect = width / Math.max(height, 1)
     const portrait = width / Math.max(height, 1) < 0.82
-    this.cameraHeight = portrait ? 13.8 : 10.6
-    this.cameraDistance = portrait ? 18.5 : 14.2
-    this.cameraTarget.set(0, portrait ? 1.25 : pileCenter.y, portrait ? 0.2 : 0)
+    this.cameraHeight = portrait ? 13.4 : 10.6
+    this.cameraDistance = portrait ? 18 : 14.2
+    this.cameraTarget.set(0, portrait ? 1.1 : pileCenter.y, portrait ? 0.15 : 0)
     this.updateCamera()
     this.camera.updateProjectionMatrix()
   }
@@ -885,6 +890,32 @@ export class ToyboxGame {
       this.cameraTarget.z + Math.cos(this.cameraYaw) * this.cameraDistance,
     )
     this.camera.lookAt(this.cameraTarget)
+    if (this.repairProject && this.playing) {
+      this.positionRepairProject(this.repairProject)
+    }
+  }
+
+  private positionRepairProject(project: THREE.Group): void {
+    project.position.x =
+      this.cameraTarget.x - Math.sin(this.cameraYaw) * REPAIR_PROJECT_DISTANCE
+    project.position.z =
+      this.cameraTarget.z - Math.cos(this.cameraYaw) * REPAIR_PROJECT_DISTANCE
+    project.rotation.y = -0.22 + this.cameraYaw - DEFAULT_CAMERA_YAW
+  }
+
+  private animateTutorialCars(): void {
+    if (this.currentLevel !== 1 || !this.playing) return
+    let index = 0
+    for (const item of this.items.values()) {
+      if (!item.selected && !item.removed) {
+        const pulse =
+          1 +
+          Math.sin(this.elapsed * TUTORIAL_CAR_PULSE_SPEED + index * 0.9) *
+            TUTORIAL_CAR_PULSE_AMOUNT
+        item.object.scale.setScalar(TUTORIAL_CAR_BASE_SCALE * pulse)
+      }
+      index += 1
+    }
   }
 
   private animate(): void {
@@ -895,6 +926,7 @@ export class ToyboxGame {
       this.elapsed += delta
       this.physics.step(delta)
       this.tweens.update(delta)
+      this.animateTutorialCars()
       if (this.repairProject && this.repairProjectActivated) {
         this.repairProject.position.y =
           this.repairProjectIdleY + Math.sin(this.elapsed * 3.5) * 0.09

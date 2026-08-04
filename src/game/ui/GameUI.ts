@@ -309,7 +309,7 @@ export class GameUI {
   }
 
   showFirstLevelHint(): void {
-    this.showToast(copy.firstLevelHint, 3200)
+    this.showToast(copy.firstLevelHint, 0)
   }
 
   showTrayEmpty(): void {
