@@ -20,11 +20,11 @@ ui.bind({
 })
 
 window.addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === ' ') {
+  if (event.target === ui.canvas && (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === ' ')) {
     event.preventDefault()
   }
 })
-window.addEventListener('wheel', (event) => event.preventDefault(), { passive: false })
+ui.canvas.addEventListener('wheel', (event) => event.preventDefault(), { passive: false })
 
 void game
   .init()

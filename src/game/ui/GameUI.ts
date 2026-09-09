@@ -1,6 +1,6 @@
 import { detectLocale, GAME_COPY } from '../i18n'
 import type { LevelConfig, ToyKind, TrayEntry } from '../types'
-import { TOY_DEFINITIONS, TOY_KINDS } from '../types'
+import { REPAIR_PROJECTS, TOY_DEFINITIONS, TOY_KINDS } from '../types'
 
 export interface UiActions {
   start: () => void
@@ -15,6 +15,19 @@ export interface UiActions {
 
 const locale = detectLocale()
 const copy = GAME_COPY[locale]
+const shelfCopy = {
+  en: ['My toy shelf', 'Repair toys to collect them. Tap a toy to play!', 'Playroom complete!'],
+  'zh-CN': ['我的玩具架', '修好的玩具会留在这里，点一下让它动起来！', '玩具房布置完成！'],
+  fr: ['Mes jouets', 'Réparez les jouets. Touchez-les pour jouer !', 'Salle de jeux complète !'],
+  it: ['I miei giocattoli', 'Ripara i giocattoli. Toccali per giocare!', 'Sala giochi completa!'],
+  de: ['Mein Spielzeugregal', 'Repariere Spielzeug. Tippe darauf zum Spielen!', 'Spielzimmer komplett!'],
+  es: ['Mis juguetes', 'Repara juguetes. ¡Tócalos para jugar!', '¡Sala de juegos completa!'],
+  ja: ['おもちゃ棚', '直したおもちゃをタップして遊ぼう！', 'おもちゃ部屋が完成！'],
+  ko: ['내 장난감 선반', '고친 장난감을 눌러서 놀아 보세요!', '놀이방 완성!'],
+  'pt-BR': ['Meus brinquedos', 'Conserte brinquedos. Toque para brincar!', 'Sala de jogos completa!'],
+  ru: ['Мои игрушки', 'Чините игрушки. Нажмите, чтобы поиграть!', 'Игровая комната готова!'],
+  tr: ['Oyuncak rafım', 'Oyuncakları onar. Oynamak için dokun!', 'Oyun odası tamamlandı!'],
+}[locale]
 document.documentElement.lang = locale
 
 const toyIconUrl = (kind: ToyKind): string =>
@@ -102,6 +115,11 @@ export class GameUI {
             <p class="overlay-copy" id="overlay-copy" aria-live="polite">${copy.tagline}</p>
             <button class="primary-button" id="primary-button" type="button" disabled>${copy.loading}</button>
             <button class="secondary-button hidden" id="secondary-button" type="button">${copy.retry}</button>
+            <details class="toy-collection">
+              <summary>${shelfCopy[0]} <span id="collection-count">0/5</span></summary>
+              <p id="collection-hint">${shelfCopy[1]}</p>
+              <div class="collection-shelf" id="collection-shelf"></div>
+            </details>
             <div class="loading-row" id="loading-text"><span>${copy.loading}</span><b>0%</b></div>
             <div class="loading-track"><div id="loading-bar"></div></div>
             <p class="asset-note">${copy.assetNote}</p>
@@ -306,6 +324,32 @@ export class GameUI {
 
   setMuted(muted: boolean): void {
     this.soundButton.textContent = muted ? '🔇' : '🔊'
+  }
+
+  setCollection(toys: readonly ToyKind[]): void {
+    const shelf = this.required('#collection-shelf')
+    shelf.replaceChildren()
+    const count = REPAIR_PROJECTS.filter((project) => toys.includes(project.model)).length
+    this.required('#collection-count').textContent = `${count}/${REPAIR_PROJECTS.length}`
+    this.required('#collection-hint').textContent = count === REPAIR_PROJECTS.length
+      ? shelfCopy[2] : shelfCopy[1]
+    shelf.classList.toggle('complete', count === REPAIR_PROJECTS.length)
+    for (const project of REPAIR_PROJECTS) {
+      const unlocked = toys.includes(project.model)
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = `shelf-toy ${unlocked ? 'unlocked' : 'locked'}`
+      button.disabled = !unlocked
+      button.setAttribute('aria-label', `${project.name}${unlocked ? '' : ' 🔒'}`)
+      button.innerHTML = `<img src="${toyIconUrl(project.model)}" alt="" draggable="false"><span>${unlocked ? project.name : '🔒'}</span>`
+      button.addEventListener('click', () => {
+        button.classList.remove('playing')
+        void button.offsetWidth
+        button.classList.add('playing')
+      })
+      button.addEventListener('animationend', () => button.classList.remove('playing'))
+      shelf.append(button)
+    }
   }
 
   showFirstLevelHint(): void {

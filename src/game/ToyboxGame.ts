@@ -5,6 +5,8 @@ import { PokiBridge } from './platform/PokiBridge'
 import { ToyFactory } from './render/ToyFactory'
 import { easing, TweenSystem } from './render/TweenSystem'
 import { GameState } from './simulation/GameState'
+import { ToyCollection } from './simulation/ToyCollection'
+import { RepairAssembly } from './render/RepairAssembly'
 import type { LevelConfig, SelectionResult, ToyKind, TrayEntry } from './types'
 import { getLevelConfig, TOY_DEFINITIONS } from './types'
 import type { GameUI } from './ui/GameUI'
@@ -64,6 +66,8 @@ export class ToyboxGame {
   private hoveredItem: PileItem | null = null
   private repairProject: THREE.Group | null = null
   private repairProjectToy: THREE.Group | null = null
+  private repairAssembly: RepairAssembly | null = null
+  private readonly collection = new ToyCollection(safeStorage())
   private readonly repairSparks = new Set<THREE.Mesh>()
   private repairMatches = 0
   private repairSteps = 1
@@ -116,6 +120,7 @@ export class ToyboxGame {
     ])
     this.poki.loadingFinished()
     this.ui.showStart()
+    this.ui.setCollection(this.collection.toys)
   }
 
   start(): void {
@@ -425,6 +430,8 @@ export class ToyboxGame {
     this.saveBest(totalScore)
 
     if (won) {
+      this.collection.unlock(this.config.repairModel)
+      this.ui.setCollection(this.collection.toys)
       this.audio.win()
       this.activateRepairProject()
       this.tweens.add({
@@ -501,6 +508,7 @@ export class ToyboxGame {
     this.scene.add(project)
     this.repairProject = project
     this.repairProjectToy = toy
+    this.repairAssembly = new RepairAssembly(toy)
     this.repairProjectActivated = false
     this.repairProjectIdleY = project.position.y
     this.updateRepairProjectAppearance(0)
@@ -509,7 +517,11 @@ export class ToyboxGame {
   private chargeRepairProject(kind: ToyKind): void {
     if (!this.repairProject || !this.repairProjectToy) return
     const progress = this.repairMatches / this.repairSteps
-    this.updateRepairProjectAppearance(progress)
+    const from = (this.repairMatches - 1) / this.repairSteps
+    this.tweens.add({
+      duration: 0.72,
+      update: (amount) => this.updateRepairProjectAppearance(from + (progress - from) * amount),
+    })
 
     const color = TOY_DEFINITIONS[kind].color
     const material = new THREE.MeshStandardMaterial({
@@ -548,20 +560,7 @@ export class ToyboxGame {
   }
 
   private updateRepairProjectAppearance(progress: number): void {
-    if (!this.repairProjectToy) return
-    const safeProgress = THREE.MathUtils.clamp(progress, 0, 1)
-    const accent = new THREE.Color(TOY_DEFINITIONS[this.config.repairModel].color)
-    this.repairProjectToy.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return
-      const materials = Array.isArray(child.material) ? child.material : [child.material]
-      for (const material of materials) {
-        if (!(material instanceof THREE.MeshStandardMaterial)) continue
-        material.transparent = safeProgress < 0.999
-        material.opacity = 0.34 + safeProgress * 0.66
-        material.emissive.copy(accent)
-        material.emissiveIntensity = 0.05 + safeProgress * 0.28
-      }
-    })
+    this.repairAssembly?.update(progress)
   }
 
   private activateRepairProject(): void {
@@ -807,6 +806,7 @@ export class ToyboxGame {
     this.repairProject?.removeFromParent()
     this.repairProject = null
     this.repairProjectToy = null
+    this.repairAssembly = null
     this.repairProjectActivated = false
     this.repairMatches = 0
     this.repairSteps = 1
@@ -944,6 +944,10 @@ export class ToyboxGame {
       // Private browsing can disable storage; gameplay must continue regardless.
     }
   }
+}
+
+function safeStorage(): Storage | null {
+  try { return window.localStorage } catch { return null }
 }
 
 function mulberry32(seed: number): () => number {

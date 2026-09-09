@@ -24,6 +24,7 @@ assert.equal(tutorialLevel.rattles, 0, 'Box 1 should not expose the rattle tool'
 assert.equal(tutorialLevel.undos, 0, 'Box 1 should not need undo')
 
 const openingLevels = [1, 2, 3, 4].map((level) => getLevelConfig(level))
+assert.deepEqual(openingLevels.map((config) => config.kinds.length * config.copiesPerKind), [3, 12, 24, 27])
 for (const config of openingLevels) {
   assert.equal(new Set(config.kinds).size, config.kinds.length, `Box ${config.number} has duplicates`)
   assert.equal(config.copiesPerKind % 3, 0, `Box ${config.number} must remain divisible by three`)

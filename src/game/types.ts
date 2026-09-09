@@ -84,7 +84,7 @@ export interface RepairProject {
 }
 
 const TUTORIAL_LEVEL_KINDS: ToyKind[] = ['car']
-const LEVEL_TWO_KINDS: ToyKind[] = ['ball', 'car', 'brick', 'rocket', 'top', 'gift']
+const LEVEL_TWO_KINDS: ToyKind[] = ['ball', 'car', 'brick', 'rocket']
 const LEVEL_THREE_KINDS: ToyKind[] = [
   'robot',
   'drum',
@@ -93,6 +93,7 @@ const LEVEL_THREE_KINDS: ToyKind[] = [
   'rover',
   'alien',
   'monster',
+  'top',
 ]
 const LEVEL_FOUR_KINDS: ToyKind[] = [
   'arcade',
@@ -102,19 +103,19 @@ const LEVEL_FOUR_KINDS: ToyKind[] = [
   'cupcake',
   'banana',
   'pineapple',
-  'robot',
+  'gift',
   'star',
 ]
 
-export function getLevelConfig(level: number): LevelConfig {
-  const repairProjects: readonly RepairProject[] = [
+export const REPAIR_PROJECTS: readonly RepairProject[] = [
     { model: 'car', name: 'Zip' },
     { model: 'train', name: 'Chug' },
     { model: 'rocket', name: 'Nova' },
     { model: 'arcade', name: 'Pixel' },
     { model: 'robot', name: 'Bolt' },
   ] as const
-  const repairProject = repairProjects[(level - 1) % repairProjects.length]
+export function getLevelConfig(level: number): LevelConfig {
+  const repairProject = REPAIR_PROJECTS[(level - 1) % REPAIR_PROJECTS.length]
   const kinds =
     level === 1
       ? TUTORIAL_LEVEL_KINDS
@@ -129,7 +130,7 @@ export function getLevelConfig(level: number): LevelConfig {
   return {
     number: level,
     kinds: [...kinds],
-    copiesPerKind: level === 1 ? 3 : 6,
+    copiesPerKind: level <= 4 ? 3 : 6,
     repairModel: repairProject.model,
     repairName: repairProject.name,
     rattles: level === 1 ? 0 : 1,
