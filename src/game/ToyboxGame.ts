@@ -97,9 +97,9 @@ export class ToyboxGame {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowPower ? 1.25 : 1.65))
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.08
+    this.renderer.toneMappingExposure = 1.0
     this.renderer.shadowMap.enabled = !lowPower
-    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.scene.add(this.environmentRoot, this.pileRoot)
     this.createEnvironment()
     this.createLights()
@@ -817,12 +817,12 @@ export class ToyboxGame {
 
   private createEnvironment(): void {
     const baseMaterial = new THREE.MeshStandardMaterial({
-      color: '#6758b7',
+      color: '#77758e',
       roughness: 0.66,
       metalness: 0,
     })
     const innerMaterial = new THREE.MeshStandardMaterial({
-      color: '#dad3ff',
+      color: '#8797a3',
       roughness: 0.82,
     })
     const floor = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.42, 6.2), baseMaterial)
@@ -847,7 +847,7 @@ export class ToyboxGame {
 
     const table = new THREE.Mesh(
       new THREE.CylinderGeometry(7.2, 7.6, 0.72, 48),
-      new THREE.MeshStandardMaterial({ color: '#f3c98b', roughness: 0.72 }),
+      new THREE.MeshStandardMaterial({ color: '#d6c5aa', roughness: 0.78 }),
     )
     table.position.y = -1.23
     table.receiveShadow = true
@@ -855,8 +855,8 @@ export class ToyboxGame {
   }
 
   private createLights(): void {
-    const hemisphere = new THREE.HemisphereLight('#f8fbff', '#64508d', 2.45)
-    const key = new THREE.DirectionalLight('#fff3dd', 3.15)
+    const hemisphere = new THREE.HemisphereLight('#f8fbff', '#656a70', 1.55)
+    const key = new THREE.DirectionalLight('#fff6e8', 3.4)
     key.position.set(-5, 10, 8)
     key.castShadow = true
     key.shadow.mapSize.set(1024, 1024)
@@ -865,7 +865,9 @@ export class ToyboxGame {
     key.shadow.camera.top = 7
     key.shadow.camera.bottom = -7
     key.shadow.bias = -0.0006
-    const fill = new THREE.DirectionalLight('#809cff', 1.1)
+    key.shadow.normalBias = 0.015
+    key.shadow.intensity = 0.8
+    const fill = new THREE.DirectionalLight('#e1edff', 0.65)
     fill.position.set(6, 5, -6)
     this.scene.add(hemisphere, key, fill)
   }

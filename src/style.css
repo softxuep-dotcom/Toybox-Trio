@@ -11,7 +11,7 @@
   font-family:
     Inter, ui-rounded, "SF Pro Rounded", "Segoe UI", system-ui, -apple-system, sans-serif;
   color: var(--ink);
-  background: #cfe8ff;
+  background: #e1e7e8;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -48,9 +48,9 @@ button:focus-visible {
   isolation: isolate;
   overflow: hidden;
   background:
-    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.9) 0 4%, transparent 4.3%),
-    radial-gradient(circle at 82% 16%, rgba(255, 255, 255, 0.55) 0 6%, transparent 6.4%),
-    linear-gradient(160deg, #d8f4ff 0%, #bcd7ff 45%, #d8caff 100%);
+    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.45) 0 4%, transparent 4.3%),
+    radial-gradient(circle at 82% 16%, rgba(255, 255, 255, 0.3) 0 6%, transparent 6.4%),
+    linear-gradient(160deg, #e7efef 0%, #d5dfe5 45%, #dcd9e4 100%);
 }
 
 #game-canvas {

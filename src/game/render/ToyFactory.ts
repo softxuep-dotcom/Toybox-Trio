@@ -121,6 +121,16 @@ export class ToyFactory {
       } else {
         child.material = child.material.clone()
       }
+      // Boost colored plastics in display space, preserving neutral wheels and trim.
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const material of materials) {
+        if (!(material instanceof THREE.MeshStandardMaterial)) continue
+        const hsl = material.color.getHSL({ h: 0, s: 0, l: 0 }, THREE.SRGBColorSpace)
+        if (hsl.s > 0.08) {
+          material.color.setHSL(hsl.h, Math.min(1, hsl.s * 1.2), hsl.l, THREE.SRGBColorSpace)
+        }
+        material.roughness = Math.max(0.38, Math.min(material.roughness, 0.62))
+      }
       child.castShadow = true
       child.receiveShadow = true
     })
